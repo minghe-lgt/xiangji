@@ -1,6 +1,6 @@
 /**
- * RAW/ARW 轻量解析 — 提取内嵌 JPEG 预览（绝大多数 ARW/CR2/NEF/ARW 都带全尺寸预览）
- * 不依赖后端；对无预览的 RAW 会给出明确提示。
+ * RAW/ARW 解析 — 提取内嵌最高分辨率 JPEG 预览 + 记录完整 RAW 尺寸
+ * 不依赖后端。真正全像素 demosaic 需要 LibRaw/厂商软件；这里尽量取到文件内最大的预览。
  */
 
 function readU16(dv, off, le) {
@@ -10,184 +10,36 @@ function readU32(dv, off, le) {
   return dv.getUint32(off, le);
 }
 
-/**
- * 从 TIFF/RAW 容器中扫描并提取内嵌 JPEG。
- * 支持：ARW / CR2 / CR3(有限) / NEF / DNG / TIFF
- * @param {ArrayBuffer} buffer
- * @returns {Promise<{blob: Blob, width: number, height: number, source: string}>}
- */
-async function extractRawPreview(buffer) {
-  const dv = new DataView(buffer);
-  if (buffer.byteLength < 8) throw new Error("文件太小，不是有效的 RAW/TIFF");
-
-  // TIFF endian
-  const bom = dv.getUint16(0, false);
-  let le;
-  if (bom === 0x4949) le = true;
-  else if (bom === 0x4d4d) le = false;
-  else {
-    // 不是 TIFF，尝试直接找 JPEG SOI（有些封装）
-    const jpeg = findJpegInBytes(new Uint8Array(buffer));
-    if (jpeg) return jpeg;
-    throw new Error("无法识别的 RAW 格式（非 TIFF/ARW 容器）");
-  }
-
-  const magic = readU16(dv, 2, le);
-  if (magic !== 42) {
-    const jpeg = findJpegInBytes(new Uint8Array(buffer));
-    if (jpeg) return jpeg;
-    throw new Error("TIFF 标记异常");
-  }
-
-  // 遍历 IFD 链，收集 JPEGInterchangeFormat / 大图 Strip
-  const candidates = [];
-
-  function readIFD(offset, depth) {
-    if (offset <= 0 || offset + 2 > buffer.byteLength || depth > 6) return;
-    const entryCount = readU16(dv, offset, le);
-    if (entryCount > 512) return;
-
-    let jpegOffset = -1;
-    let jpegLength = -1;
-    let stripOffset = -1;
-    let stripLength = -1;
-    let subIFDOffsets = [];
-    let imageWidth = 0;
-    let imageLength = 0;
-    let compression = 1;
-    let photometric = 0;
-    let bitsPerSample = 8;
-
-    for (let i = 0; i < entryCount; i++) {
-      const e = offset + 2 + i * 12;
-      if (e + 12 > buffer.byteLength) break;
-      const tag = readU16(dv, e, le);
-      const type = readU16(dv, e + 2, le);
-      const count = readU32(dv, e + 4, le);
-      const valOff = e + 8;
-
-      let value;
-      if (type === 3 && count === 1) value = readU16(dv, valOff, le);
-      else if (type === 4 && count === 1) value = readU32(dv, valOff, le);
-      else if (type === 4 && count > 1) {
-        const p = readU32(dv, valOff, le);
-        // 读取多个 long（SubIFD 偏移）
-        for (let k = 0; k < Math.min(count, 8); k++) {
-          const off = readU32(dv, p + k * 4, le);
-          if (off > 0) subIFDOffsets.push(off);
-        }
-        value = undefined;
-      } else if (type === 3 && count > 1) {
-        const p = readU32(dv, valOff, le);
-        const arr = [];
-        for (let k = 0; k < Math.min(count, 8); k++) arr.push(readU16(dv, p + k * 2, le));
-        value = arr;
-      } else {
-        value = readU32(dv, valOff, le);
-      }
-
-      switch (tag) {
-        case 256: imageWidth = value; break; // ImageWidth
-        case 257: imageLength = value; break; // ImageLength
-        case 259: compression = value; break;
-        case 262: photometric = value; break;
-        case 258: bitsPerSample = Array.isArray(value) ? value[0] : value; break;
-        case 513: jpegOffset = value; break; // JPEGInterchangeFormat
-        case 514: jpegLength = value; break; // JPEGInterchangeFormatLength
-        case 273: // StripOffsets
-          if (count === 1) stripOffset = value;
-          else if (Array.isArray(value) && value.length) stripOffset = value[0];
-          break;
-        case 279: // StripByteCounts
-          if (count === 1) stripLength = value;
-          else if (Array.isArray(value) && value.length) stripLength = value[0];
-          break;
-        case 330: // SubIFDs
-          if (count === 1 && typeof value === "number") subIFDOffsets.push(value);
-          break;
-        default:
-          break;
-      }
+/** 从 JPEG 码流解析真实像素尺寸（SOF0/1/2/3） */
+function jpegDimensions(bytes) {
+  if (!bytes || bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  let i = 2;
+  while (i < bytes.length - 8) {
+    if (bytes[i] !== 0xff) {
+      i++;
+      continue;
     }
-
-    // JPEG preview via JPEGInterchangeFormat
-    if (jpegOffset > 0 && jpegLength > 16) {
-      const end = Math.min(buffer.byteLength, jpegOffset + jpegLength);
-      const bytes = new Uint8Array(buffer, jpegOffset, end - jpegOffset);
-      if (bytes[0] === 0xff && bytes[1] === 0xd8) {
-        candidates.push({ bytes, width: imageWidth, height: imageLength, kind: "jpeg-IFD" });
-      }
+    const marker = bytes[i + 1];
+    // 填充字节
+    if (marker === 0xff) {
+      i++;
+      continue;
     }
-
-    // Strip 里直接是 JPEG（常见于预览）
-    if (stripOffset > 0 && stripLength > 16) {
-      const end = Math.min(buffer.byteLength, stripOffset + stripLength);
-      const bytes = new Uint8Array(buffer, stripOffset, end - stripOffset);
-      if (bytes[0] === 0xff && bytes[1] === 0xd8) {
-        candidates.push({ bytes, width: imageWidth, height: imageLength, kind: "jpeg-strip" });
-      }
+    // 无长度段
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+      i += 2;
+      continue;
     }
-
-    // SubIFDs
-    for (const s of subIFDOffsets) readIFD(s, depth + 1);
-
-    // next IFD
-    const next = offset + 2 + entryCount * 12;
-    if (next + 4 <= buffer.byteLength) {
-      const nextOff = readU32(dv, next, le);
-      if (nextOff > 0 && nextOff < buffer.byteLength) readIFD(nextOff, depth + 1);
+    const len = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (len < 2) break;
+    // SOF0/1/2/3/5/6/7/9/10/11/13/14/15
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      const precision = bytes[i + 4];
+      const height = (bytes[i + 5] << 8) | bytes[i + 6];
+      const width = (bytes[i + 7] << 8) | bytes[i + 8];
+      return { width, height, precision };
     }
-  }
-
-  const firstIFD = readU32(dv, 4, le);
-  readIFD(firstIFD, 0);
-
-  // 选最大的预览
-  if (candidates.length) {
-    candidates.sort((a, b) => b.bytes.length - a.bytes.length);
-    const best = candidates[0];
-    // 精确 JPEG 长度（到 EOI）
-    const jpegBytes = trimJpeg(best.bytes);
-    const blob = new Blob([jpegBytes], { type: "image/jpeg" });
-    const dim = await imageBlobSize(blob);
-    return {
-      blob,
-      width: dim.width || best.width,
-      height: dim.height || best.height,
-      source: `RAW 内嵌预览 · ${best.kind}`,
-    };
-  }
-
-  // 全文件扫 JPEG（兜底）
-  const scanned = findJpegInBytes(new Uint8Array(buffer));
-  if (scanned) return scanned;
-
-  throw new Error("这个 RAW 里没有可用的 JPEG 预览。请先用相机/厂商软件导出 JPEG，或用 DNG/RAW 预览导出功能。");
-}
-
-function findJpegInBytes(bytes) {
-  for (let i = 0; i < bytes.length - 4; i++) {
-    if (bytes[i] === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff) {
-      // 找 EOI
-      for (let j = i + 3; j < bytes.length - 1; j++) {
-        if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
-          const slice = bytes.subarray(i, j + 2);
-          if (slice.length > 20000) {
-            // 大于 20KB 才当有效预览
-            return (async () => {
-              const blob = new Blob([slice], { type: "image/jpeg" });
-              const dim = await imageBlobSize(blob);
-              return {
-                blob,
-                width: dim.width,
-                height: dim.height,
-                source: "RAW 内嵌 JPEG（扫描）",
-              };
-            })();
-          }
-        }
-      }
-    }
+    i += 2 + len;
   }
   return null;
 }
@@ -215,15 +67,252 @@ function imageBlobSize(blob) {
   });
 }
 
-/** 判断文件是否是 RAW 容器 */
+/**
+ * 从 TIFF/RAW 容器扫描所有内嵌 JPEG，选像素最大的。
+ * 同时读取 CFA/SubIFD 上的完整 RAW 分辨率。
+ */
+async function extractRawPreview(buffer) {
+  const dv = new DataView(buffer);
+  if (buffer.byteLength < 8) throw new Error("文件太小，不是有效的 RAW/TIFF");
+
+  const candidates = []; // { bytes, width, height, kind }
+  let rawWidth = 0;
+  let rawHeight = 0;
+  let rawBits = 0;
+
+  function pushJpeg(bytes, kind, hintW, hintH) {
+    if (!bytes || bytes.length < 2000) return;
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return;
+    const trimmed = trimJpeg(bytes);
+    const dim = jpegDimensions(trimmed);
+    const width = (dim && dim.width) || hintW || 0;
+    const height = (dim && dim.height) || hintH || 0;
+    const pixels = width * height;
+    candidates.push({ bytes: trimmed, width, height, pixels, kind });
+  }
+
+  // TIFF 结构
+  const bom = dv.getUint16(0, false);
+  let le;
+  if (bom === 0x4949) le = true;
+  else if (bom === 0x4d4d) le = false;
+
+  if (le === undefined) {
+    // 兜底：全文件扫 JPEG
+    const all = scanAllJpegs(new Uint8Array(buffer));
+    if (!all.length) throw new Error("无法识别的 RAW 格式");
+    all.sort((a, b) => b.pixels - a.pixels);
+    return await finalizeCandidate(all[0], buffer.byteLength);
+  }
+
+  const magic = readU16(dv, 2, le);
+  if (magic !== 42) {
+    const all = scanAllJpegs(new Uint8Array(buffer));
+    if (!all.length) throw new Error("TIFF 标记异常");
+    all.sort((a, b) => b.pixels - a.pixels);
+    return await finalizeCandidate(all[0], buffer.byteLength);
+  }
+
+  function readIFD(offset, depth) {
+    if (offset <= 0 || offset + 2 > buffer.byteLength || depth > 8) return;
+    const entryCount = readU16(dv, offset, le);
+    if (entryCount > 512) return;
+
+    let jpegOffset = -1;
+    let jpegLength = -1;
+    let stripOffsets = [];
+    let stripLengths = [];
+    let subIFDOffsets = [];
+    let imageWidth = 0;
+    let imageLength = 0;
+    let compression = 1;
+    let photometric = 0;
+    let bitsPerSample = 8;
+
+    for (let i = 0; i < entryCount; i++) {
+      const e = offset + 2 + i * 12;
+      if (e + 12 > buffer.byteLength) break;
+      const tag = readU16(dv, e, le);
+      const type = readU16(dv, e + 2, le);
+      const count = readU32(dv, e + 4, le);
+      const valOff = e + 8;
+
+      let value;
+      if (type === 3 && count === 1) value = readU16(dv, valOff, le);
+      else if (type === 4 && count === 1) value = readU32(dv, valOff, le);
+      else if (type === 4 && count > 1) {
+        const p = readU32(dv, valOff, le);
+        for (let k = 0; k < Math.min(count, 16); k++) {
+          if (p + k * 4 + 4 > buffer.byteLength) break;
+          const off = readU32(dv, p + k * 4, le);
+          if (off > 0) subIFDOffsets.push(off);
+        }
+        value = undefined;
+      } else if (type === 3 && count > 1) {
+        const p = readU32(dv, valOff, le);
+        const arr = [];
+        for (let k = 0; k < Math.min(count, 16); k++) {
+          if (p + k * 2 + 2 > buffer.byteLength) break;
+          arr.push(readU16(dv, p + k * 2, le));
+        }
+        value = arr;
+      } else {
+        value = readU32(dv, valOff, le);
+      }
+
+      switch (tag) {
+        case 256: imageWidth = value; break;
+        case 257: imageLength = value; break;
+        case 258: bitsPerSample = Array.isArray(value) ? value[0] : value; break;
+        case 259: compression = value; break;
+        case 262: photometric = value; break;
+        case 273: // StripOffsets
+          if (count === 1) stripOffsets = [value];
+          else if (Array.isArray(value)) stripOffsets = value.slice();
+          break;
+        case 278: break;
+        case 279: // StripByteCounts
+          if (count === 1) stripLengths = [value];
+          else if (Array.isArray(value)) stripLengths = value.slice();
+          break;
+        case 330:
+          if (count === 1 && typeof value === "number") subIFDOffsets.push(value);
+          break;
+        case 513: jpegOffset = value; break;
+        case 514: jpegLength = value; break;
+        default:
+          break;
+      }
+    }
+
+    // CFA / RAW 主数据尺寸（photometric 32803=CFA，或 SubIFD 大图）
+    const isCFA = photometric === 32803 || photometric === 34892;
+    const area = imageWidth * imageLength;
+    if (area > rawWidth * rawHeight && imageWidth > 100) {
+      // 仅当像 RAW 主图（宽高都大）时记录
+      if (isCFA || area > 500000) {
+        rawWidth = imageWidth;
+        rawHeight = imageLength;
+        rawBits = bitsPerSample;
+      }
+    }
+
+    // JPEGInterchangeFormat
+    if (jpegOffset > 0 && jpegLength > 2000) {
+      const end = Math.min(buffer.byteLength, jpegOffset + jpegLength);
+      pushJpeg(new Uint8Array(buffer, jpegOffset, end - jpegOffset), "jpeg-IFD", imageWidth, imageLength);
+    }
+
+    // Strip 里直接是 JPEG
+    if (stripOffsets.length) {
+      for (let s = 0; s < Math.min(stripOffsets.length, 4); s++) {
+        const off = stripOffsets[s];
+        const len = stripLengths[s] || 0;
+        if (off > 0 && len > 2000) {
+          const end = Math.min(buffer.byteLength, off + len);
+          pushJpeg(new Uint8Array(buffer, off, end - off), "jpeg-strip", imageWidth, imageLength);
+        }
+      }
+    }
+
+    for (const s of subIFDOffsets) readIFD(s, depth + 1);
+
+    const next = offset + 2 + entryCount * 12;
+    if (next + 4 <= buffer.byteLength) {
+      const nextOff = readU32(dv, next, le);
+      if (nextOff > 0 && nextOff < buffer.byteLength && nextOff !== offset) readIFD(nextOff, depth + 1);
+    }
+  }
+
+  readIFD(readU32(dv, 4, le), 0);
+
+  // 全文件扫描补漏（有的预览不在 IFD 标签里）
+  const scanned = scanAllJpegs(new Uint8Array(buffer));
+  for (const s of scanned) {
+    if (!candidates.some((c) => c.bytes.length === s.bytes.length && c.pixels === s.pixels)) {
+      candidates.push({ ...s, kind: "jpeg-scan" });
+    }
+  }
+
+  if (!candidates.length) {
+    throw new Error(
+      "这个 RAW 里没有可用的 JPEG 预览。请用相机「RAW+JPEG」格式，或从 Imaging Edge / Lightroom 导出 JPEG 后再导入。"
+    );
+  }
+
+  // 选像素最多的（真分辨率优先）
+  candidates.sort((a, b) => {
+    if (b.pixels !== a.pixels) return b.pixels - a.pixels;
+    return b.bytes.length - a.bytes.length;
+  });
+
+  return await finalizeCandidate(candidates[0], buffer.byteLength, rawWidth, rawHeight, rawBits, candidates.length);
+}
+
+function scanAllJpegs(bytes) {
+  const found = [];
+  for (let i = 0; i < bytes.length - 4; i++) {
+    if (bytes[i] === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff) {
+      for (let j = i + 3; j < bytes.length - 1; j++) {
+        if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
+          const slice = bytes.subarray(i, j + 2);
+          if (slice.length > 30000) {
+            const dim = jpegDimensions(slice);
+            const width = dim ? dim.width : 0;
+            const height = dim ? dim.height : 0;
+            found.push({
+              bytes: slice,
+              width,
+              height,
+              pixels: width * height,
+              kind: "jpeg-scan",
+            });
+          }
+          break;
+        }
+      }
+      i += 2;
+    }
+  }
+  return found;
+}
+
+async function finalizeCandidate(best, fileSize, rawW, rawH, rawBits, total) {
+  const blob = new Blob([best.bytes], { type: "image/jpeg" });
+  const dim = await imageBlobSize(blob);
+  const width = dim.width || best.width;
+  const height = dim.height || best.height;
+  const mp = ((width * height) / 1e6).toFixed(1);
+  const rawMp = rawW ? ((rawW * rawH) / 1e6).toFixed(1) : null;
+
+  let source = `RAW 预览 · ${best.kind} · ${width}×${height} (${mp}MP)`;
+  if (total && total > 1) source += ` · 已选文件内 ${total} 张预览中最大者`;
+  if (rawW && rawH && (rawW > width || rawH > height)) {
+    source += ` · 完整 RAW ${rawW}×${rawH} (${rawMp}MP${rawBits ? `, ${rawBits}bit` : ""})`;
+  }
+
+  return {
+    blob,
+    width,
+    height,
+    rawWidth: rawW || 0,
+    rawHeight: rawH || 0,
+    source,
+    isFullRaw: rawW > 0 && width >= rawW * 0.95,
+  };
+}
+
 function isRawFile(file) {
   const name = (file.name || "").toLowerCase();
-  return /\.(arw|cr2|cr3|nef|dng|orf|raf|rw2|pef|srw|arq|raw)$/.test(name) || file.type === "image/x-sony-arw" || file.type === "image/x-canon-cr2";
+  return (
+    /\.(arw|cr2|cr3|nef|dng|orf|raf|rw2|pef|srw|arq|raw)$/.test(name) ||
+    file.type === "image/x-sony-arw" ||
+    file.type === "image/x-canon-cr2"
+  );
 }
 
 /**
- * 统一入口：普通图片直接解码，RAW 提取内嵌预览
- * @returns {Promise<{img: HTMLImageElement, note: string}>}
+ * 统一入口：普通图片直接解码，RAW 提取内嵌最大预览
  */
 async function loadPhotoFile(file) {
   if (isRawFile(file) || file.size > 25 * 1024 * 1024) {
@@ -234,7 +323,10 @@ async function loadPhotoFile(file) {
       const img = await loadImage(url);
       return {
         img,
-        note: `${file.name} · ${preview.source}${preview.width ? ` · ${preview.width}×${preview.height}` : ""}`,
+        note: `${file.name} · ${preview.source}`,
+        rawWidth: preview.rawWidth,
+        rawHeight: preview.rawHeight,
+        isFullRaw: preview.isFullRaw,
         cleanup: () => URL.revokeObjectURL(url),
       };
     } catch (e) {
@@ -248,6 +340,9 @@ async function loadPhotoFile(file) {
     return {
       img,
       note: `${file.name} · ${img.naturalWidth}×${img.naturalHeight}`,
+      rawWidth: img.naturalWidth,
+      rawHeight: img.naturalHeight,
+      isFullRaw: true,
       cleanup: () => URL.revokeObjectURL(url),
     };
   } catch (e) {

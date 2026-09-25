@@ -1063,6 +1063,13 @@ select { font: inherit; color: inherit; }
   flex-wrap: wrap;
 }
 
+.grade-meta-bar .mono {
+  flex: 1;
+  min-width: 200px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
 .grade-meta-actions {
   display: flex;
   gap: 8px;

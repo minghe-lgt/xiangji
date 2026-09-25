@@ -617,8 +617,16 @@ function setupGrade() {
 
   $("#exportBtn").addEventListener("click", async () => {
     if (!gradeState.sourceCanvas) return;
-    const blob = await exportCanvasJPEG(gradeCanvas, 0.92);
+    const full = renderFullGrade() || gradeCanvas;
+    const blob = await exportCanvasJPEG(full, 0.95);
     if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.jpg`);
+  });
+
+  $("#exportPngBtn").addEventListener("click", async () => {
+    if (!gradeState.sourceCanvas) return;
+    const full = renderFullGrade() || gradeCanvas;
+    const blob = await exportCanvasPNG(full);
+    if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.png`);
   });
 
   // LLM config
@@ -795,12 +803,13 @@ function repaintGrade() {
     return;
   }
 
-  // 限制预览尺寸，保证流畅
-  const maxSide = 1400;
+  // 预览可以缩，但导出用 sourceCanvas 全分辨率
+  // 这里把 target 画成预览尺寸；导出时单独走 full render
+  const maxPreview = 1600;
   let sw = src.width;
   let sh = src.height;
-  if (Math.max(sw, sh) > maxSide) {
-    const s = maxSide / Math.max(sw, sh);
+  if (Math.max(sw, sh) > maxPreview) {
+    const s = maxPreview / Math.max(sw, sh);
     sw = Math.round(sw * s);
     sh = Math.round(sh * s);
   }
@@ -816,19 +825,28 @@ function repaintGrade() {
   target.getContext("2d").drawImage(graded, 0, 0);
 }
 
+/** 全分辨率调色渲染（导出用） */
+function renderFullGrade() {
+  if (!gradeState.sourceCanvas) return null;
+  return applyGrade(gradeState.sourceCanvas, gradeState.params);
+}
+
 async function handleGradeFile(file) {
   try {
     const loaded = await loadPhotoFile(file);
     const img = loaded.img;
 
-    // 全分辨率源（限制最长边 2400 以免内存爆）
-    const maxSide = 2400;
+    // 保留 RAW 内嵌预览的原始分辨率，不再强行砍到 2400
+    // 仅对超大图做保护（>4000px 时限制，避免浏览器内存压力）
+    const maxSide = 4000;
     let w = img.naturalWidth;
     let h = img.naturalHeight;
+    let scaled = false;
     if (Math.max(w, h) > maxSide) {
       const s = maxSide / Math.max(w, h);
       w = Math.round(w * s);
       h = Math.round(h * s);
+      scaled = true;
     }
     const src = document.createElement("canvas");
     src.width = w;
@@ -842,13 +860,20 @@ async function handleGradeFile(file) {
 
     $("#gradeEmpty").classList.add("hidden");
     $("#gradePreview").classList.remove("hidden");
-    $("#gradeMeta").textContent = loaded.note || `${file.name}`;
+
+    // 更明确的质量说明
+    let note = loaded.note || `${file.name} · ${w}×${h}`;
+    if (loaded.rawWidth && loaded.rawHeight && (loaded.rawWidth > w || loaded.rawHeight > h)) {
+      note += `｜已按预览处理；完整 RAW 像素需厂商软件/LibRaw 解码`;
+    }
+    if (scaled) note += `｜为性能缩放至 ${w}×${h}`;
+    $("#gradeMeta").textContent = note;
     $("#compareBadge").textContent = "效果预览";
     $$("#presetGrid .preset-btn").forEach((el) => el.classList.remove("active"));
     renderSliders();
     repaintGrade();
 
-    // 默认跑一次自动校正，方便上手
+    // 默认跑一次自动校正
     const meta = estimateMetaFromCanvas(src);
     gradeState.params = autoGradeFromHistogram(null, meta);
     gradeState.activePreset = "auto";
@@ -856,10 +881,7 @@ async function handleGradeFile(file) {
     renderSliders();
     repaintGrade();
 
-    if (loaded.cleanup) {
-      // 保留 img 引用已绘制，可释放 blob URL
-      loaded.cleanup();
-    }
+    if (loaded.cleanup) loaded.cleanup();
   } catch (err) {
     alert(err.message || String(err));
   }

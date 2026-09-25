@@ -480,9 +480,16 @@ async function askLLMGrade(canvas, userIntent, meta) {
 }
 
 /** 导出调色后的 JPEG */
-function exportCanvasJPEG(canvas, quality = 0.92) {
+function exportCanvasJPEG(canvas, quality = 0.95) {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+  });
+}
+
+/** 导出无损 PNG */
+function exportCanvasPNG(canvas) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
   });
 }
 
