@@ -1,6 +1,6 @@
 /**
  * 能力诊断 — 题库 + 照片能力结合 + 起点推荐
- * 16 题 × 6 维度，配合 2–3 张作品分析，定位该从哪周开始补。
+ * 18 题 × 6 维度，配合 10–20 张作品分析，定位该从哪周开始补。
  */
 
 const QUIZ_DIMENSIONS = {
@@ -224,8 +224,7 @@ function buildAssessment({ quizAnswers, photoResults }) {
     dimScores[k] = v.total ? Math.round((v.correct / v.total) * 100) : 0;
   }
 
-  // 照片维度合并：analyzeImage 的 dims key
-  // composition/exposure/color/sharpness/light/balance
+  // 照片维度合并：去掉最高/最低 15% 后取均值，减少单张废片/神片干扰
   const photoAgg = {
     composition: 0,
     exposure: 0,
@@ -235,18 +234,25 @@ function buildAssessment({ quizAnswers, photoResults }) {
     balance: 0,
   };
   if (photoResults && photoResults.length) {
-    for (const p of photoResults) {
-      for (const d of p.dims || []) {
-        if (photoAgg[d.key] !== undefined) photoAgg[d.key] += d.score;
-      }
-    }
-    for (const k of Object.keys(photoAgg)) {
-      photoAgg[k] = Math.round(photoAgg[k] / photoResults.length);
+    for (const key of Object.keys(photoAgg)) {
+      const vals = photoResults
+        .map((p) => {
+          const d = (p.dims || []).find((x) => x.key === key);
+          return d ? d.score : null;
+        })
+        .filter((v) => typeof v === "number")
+        .sort((a, b) => a - b);
+      photoAgg[key] = trimmedMean(vals);
     }
   }
 
-  // 综合能力：题 55% + 照片 45%（有照片时）
   const hasPhotos = photoResults && photoResults.length > 0;
+
+  const photoAvg = hasPhotos
+    ? trimmedMean(photoResults.map((p) => p.overall).sort((a, b) => a - b))
+    : null;
+
+  // 综合能力：题 55% + 照片 45%（有照片时）
   function blend(quizScore, photoScore) {
     if (!hasPhotos) return quizScore;
     return Math.round(quizScore * 0.55 + photoScore * 0.45);
@@ -277,9 +283,6 @@ function buildAssessment({ quizAnswers, photoResults }) {
   // 起点周
   let startWeek = weakest[0] && weakest[0].weeks ? weakest[0].weeks[0] : 1;
   const quizAvg = Math.round((correct / QUIZ_BANK.length) * 100);
-  const photoAvg = hasPhotos
-    ? Math.round(photoResults.reduce((s, p) => s + p.overall, 0) / photoResults.length)
-    : null;
   const combined = hasPhotos ? Math.round(quizAvg * 0.55 + photoAvg * 0.45) : quizAvg;
 
   const weakestScore = weakest[0] ? weakest[0].score : 100;
@@ -345,3 +348,13 @@ const gapAdvice = {
   color: "练白平衡与 HSL：同场景四种白平衡，再只调关键色后期一次。",
   method: "做一次 9 张组照选题（统一色调/画幅），或完成一次街头 30 张选 5。",
 };
+
+/** 去掉两端 15% 后的均值，用于 10–20 张作品的稳健统计 */
+function trimmedMean(sortedAsc) {
+  if (!sortedAsc || !sortedAsc.length) return 0;
+  const n = sortedAsc.length;
+  if (n <= 3) return Math.round(sortedAsc.reduce((a, b) => a + b, 0) / n);
+  const cut = Math.max(0, Math.floor(n * 0.15));
+  const slice = sortedAsc.slice(cut, n - cut);
+  return Math.round(slice.reduce((a, b) => a + b, 0) / slice.length);
+}

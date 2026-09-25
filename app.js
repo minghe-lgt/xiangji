@@ -1533,9 +1533,14 @@ function setupAssessment() {
   drop.addEventListener("drop", (e) => handleAssessFiles(e.dataTransfer.files));
 
   function handleAssessFiles(fileList) {
-    const imgs = [...fileList].filter((f) => f.type.startsWith("image/")).slice(0, 3);
+    const imgs = [...fileList].filter((f) => f.type.startsWith("image/")).slice(0, 20);
     assessState.photos = imgs;
-    $("#assessPhotoStatus").textContent = imgs.length ? `已选 ${imgs.length} 张` : "未选择";
+    const n = imgs.length;
+    $("#assessPhotoStatus").textContent = n
+      ? n < 10
+        ? `已选 ${n} 张（建议 10–20 张，仍可继续）`
+        : `已选 ${n} 张`
+      : "未选择";
     $("#assessThumbs").innerHTML = imgs
       .map((f) => `<img src="${URL.createObjectURL(f)}" alt="" />`)
       .join("");
@@ -1543,8 +1548,11 @@ function setupAssessment() {
 
   async function analyzeAssessPhotos() {
     assessState.results = [];
-    for (const f of assessState.photos) {
+    const total = assessState.photos.length;
+    for (let i = 0; i < total; i++) {
+      const f = assessState.photos[i];
       try {
+        $("#assessPhotoStatus").textContent = `分析中 ${i + 1} / ${total} …`;
         const loaded = await loadPhotoFile(f);
         const result = analyzeImage(loaded.img);
         assessState.results.push(result);
@@ -1553,6 +1561,7 @@ function setupAssessment() {
         console.warn("assess photo fail", e);
       }
     }
+    $("#assessPhotoStatus").textContent = total ? `已分析 ${assessState.results.length} / ${total} 张` : "未选择";
     return assessState.results;
   }
 
@@ -1566,7 +1575,9 @@ function setupAssessment() {
         ? `基础很稳，建议直接进入 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong>（题材/进阶）打磨。`
         : `建议从 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong> 开始补齐；也可按下面优先级从弱项攻。`;
     $("#reportMeta").textContent = `答题 ${report.quizCorrect}/${report.quizTotal}（${report.quizAvg} 分）` +
-      (report.hasPhotos ? ` · 作品均分 ${report.photoAvg}` : " · 未提供作品");
+      (report.hasPhotos
+        ? ` · 作品 ${assessState.results.length} 张均分 ${report.photoAvg}`
+        : " · 未提供作品");
 
     $("#reportDims").innerHTML = Object.entries(report.dimScores)
       .map(([k, v]) => {
