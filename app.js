@@ -1468,6 +1468,10 @@ function setupAssessment() {
           `
             )
             .join("")}
+          <label class="quiz-opt quiz-unknown ${assessState.answers[q.id] === -1 ? "selected" : ""}">
+            <input type="radio" name="q${q.id}" value="-1" ${assessState.answers[q.id] === -1 ? "checked" : ""} />
+            <span>E. 不懂（不要硬猜）</span>
+          </label>
         </div>
       </div>
     `
@@ -1502,10 +1506,31 @@ function setupAssessment() {
   $("#quizSubmitBtn").addEventListener("click", () => {
     const n = Object.keys(assessState.answers).length;
     if (n < QUIZ_BANK.length) {
-      if (!confirm(`还有 ${QUIZ_BANK.length - n} 题未作答，仍要继续吗？未答题按错题计。`)) return;
+      if (!confirm(`还有 ${QUIZ_BANK.length - n} 题未作答（未答按「不懂」计）。仍要继续吗？`)) return;
     }
     $("#assessPhotoWrap").classList.remove("hidden");
     $("#assessPhotoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  // Modal open/close
+  const overlay = $("#assessOverlay");
+  function openAssess() {
+    overlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    overlay.querySelector(".assess-modal")?.scrollTo?.({ top: 0 });
+  }
+  function closeAssess() {
+    overlay.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+  $("#openAssessBtn")?.addEventListener("click", openAssess);
+  $("#closeAssessBtn")?.addEventListener("click", closeAssess);
+  $("#reportClose")?.addEventListener("click", closeAssess);
+  overlay?.addEventListener("click", (e) => {
+    if (e.target === overlay) closeAssess();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !overlay.classList.contains("hidden")) closeAssess();
   });
 
   // photos
@@ -1574,7 +1599,7 @@ function setupAssessment() {
       report.combined >= 85
         ? `基础很稳，建议直接进入 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong>（题材/进阶）打磨。`
         : `建议从 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong> 开始补齐；也可按下面优先级从弱项攻。`;
-    $("#reportMeta").textContent = `答题 ${report.quizCorrect}/${report.quizTotal}（${report.quizAvg} 分）` +
+    $("#reportMeta").textContent = `答题 正确 ${report.quizCorrect} · 猜错 ${report.quizWrong} · 不懂 ${report.quizUnknown}（满分 ${report.quizTotal}）` +
       (report.hasPhotos
         ? ` · 作品 ${assessState.results.length} 张均分 ${report.photoAvg}`
         : " · 未提供作品");
@@ -1608,8 +1633,8 @@ function setupAssessment() {
       ? report.wrong
           .map(
             (w) => `
-      <div class="wrong-item">
-        <div class="wq">[${w.dim}] ${w.q}</div>
+      <div class="wrong-item ${w.type === "unknown" ? "is-unknown" : "is-wrong"}">
+        <div class="wq">[${w.dim}] ${w.type === "unknown" ? "知识缺口" : "易错"} · ${w.q}</div>
         <div class="we">${w.explain}</div>
       </div>
     `
@@ -1658,14 +1683,14 @@ function setupAssessment() {
   });
 
   $("#reportGoPlan").addEventListener("click", () => {
-    // 高亮推荐周
-    setTimeout(() => {
-      const week = document.querySelector(`[data-week="${assessState._lastStartWeek || 1}"]`);
-      if (week) {
-        week.classList.add("open");
-        week.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }, 400);
+    closeAssess();
+    const week = document.querySelector(`[data-week="${assessState._lastStartWeek || 1}"]`);
+    if (week) {
+      week.classList.add("open");
+      week.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      $("#plan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   });
 
   renderQuiz();

@@ -199,29 +199,49 @@ const QUIZ_BANK = [
   },
 ];
 
-/** 诊断报告：结合答题 + 照片分析 */
+/** 诊断报告：结合答题 + 照片分析
+ * answer 约定：0-3 = 选项 A-D；-1 = 不懂（知识缺口，不算猜错）
+ */
 function buildAssessment({ quizAnswers, photoResults }) {
-  // quiz: { [questionId]: optionIndex }
-  // photoResults: [{ overall, dims: [{key,score}], genre }]
+  // quiz: { [questionId]: optionIndex | -1 }
+  const UNKNOWN = -1;
   const dimStats = {};
   for (const key of Object.keys(QUIZ_DIMENSIONS)) {
-    dimStats[key] = { correct: 0, total: 0, name: QUIZ_DIMENSIONS[key].name };
+    dimStats[key] = { correct: 0, wrong: 0, unknown: 0, total: 0, name: QUIZ_DIMENSIONS[key].name };
   }
 
   let correct = 0;
+  let wrong = 0;
+  let unknown = 0;
   for (const q of QUIZ_BANK) {
     const pick = quizAnswers[q.id];
     const d = dimStats[q.dim];
     d.total++;
-    if (pick === q.answer) {
+    if (pick === undefined || pick === null) {
+      // 未答视为不懂
+      d.unknown++;
+      unknown++;
+    } else if (pick === UNKNOWN) {
+      d.unknown++;
+      unknown++;
+    } else if (pick === q.answer) {
       d.correct++;
       correct++;
+    } else {
+      d.wrong++;
+      wrong++;
     }
   }
 
+  // 维度分：正确率给分；「不懂」按 40% 折算（比猜错温和，但反映缺口）
   const dimScores = {};
   for (const [k, v] of Object.entries(dimStats)) {
-    dimScores[k] = v.total ? Math.round((v.correct / v.total) * 100) : 0;
+    if (!v.total) {
+      dimScores[k] = 0;
+      continue;
+    }
+    const score = (v.correct + v.unknown * 0.4) / v.total;
+    dimScores[k] = Math.round(score * 100);
   }
 
   // 照片维度合并：去掉最高/最低 15% 后取均值，减少单张废片/神片干扰
@@ -282,7 +302,8 @@ function buildAssessment({ quizAnswers, photoResults }) {
 
   // 起点周
   let startWeek = weakest[0] && weakest[0].weeks ? weakest[0].weeks[0] : 1;
-  const quizAvg = Math.round((correct / QUIZ_BANK.length) * 100);
+  // 得分：正确 1 分，不懂 0.4 分，猜错 0 分
+  const quizAvg = Math.round(((correct + unknown * 0.4) / QUIZ_BANK.length) * 100);
   const combined = hasPhotos ? Math.round(quizAvg * 0.55 + photoAvg * 0.45) : quizAvg;
 
   const weakestScore = weakest[0] ? weakest[0].score : 100;
@@ -310,8 +331,22 @@ function buildAssessment({ quizAnswers, photoResults }) {
     };
   });
 
-  // 错题
-  const wrong = QUIZ_BANK.filter((q) => quizAnswers[q.id] !== q.answer).map((q) => ({
+  // 错题 + 知识缺口
+  const wrongList = QUIZ_BANK.filter((q) => {
+    const pick = quizAnswers[q.id];
+    return pick !== undefined && pick !== null && pick !== UNKNOWN && pick !== q.answer;
+  }).map((q) => ({
+    type: "wrong",
+    q: q.q,
+    explain: q.explain,
+    dim: QUIZ_DIMENSIONS[q.dim].name,
+  }));
+
+  const unknownList = QUIZ_BANK.filter((q) => {
+    const pick = quizAnswers[q.id];
+    return pick === undefined || pick === null || pick === UNKNOWN;
+  }).map((q) => ({
+    type: "unknown",
     q: q.q,
     explain: q.explain,
     dim: QUIZ_DIMENSIONS[q.dim].name,
@@ -319,6 +354,8 @@ function buildAssessment({ quizAnswers, photoResults }) {
 
   return {
     quizCorrect: correct,
+    quizWrong: wrong,
+    quizUnknown: unknown,
     quizTotal: QUIZ_BANK.length,
     quizAvg,
     photoAvg,
@@ -328,7 +365,7 @@ function buildAssessment({ quizAnswers, photoResults }) {
     hasPhotos,
     startWeek,
     gaps,
-    wrong,
+    wrong: [...wrongList, ...unknownList],
     level:
       combined >= 85
         ? "进阶"
