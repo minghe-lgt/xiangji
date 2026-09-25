@@ -24,6 +24,7 @@
     <nav class="nav">
       <a href="#plan">训练体系</a>
       <a href="#analyze">专业分析</a>
+      <a href="#grade">调色工作台</a>
       <a href="#drills">日常练习</a>
       <a href="#library">书单课单</a>
       <a href="#cheatsheet">构图速查</a>
@@ -233,6 +234,103 @@
       </div>
     </section>
 
+    <!-- Color Grading Studio -->
+    <section class="section" id="grade">
+      <div class="section-head">
+        <p class="eyebrow">COLOR GRADING STUDIO</p>
+        <h2>调色工作台</h2>
+        <p class="section-desc">
+          支持 ARW / CR2 / NEF / DNG 等 RAW（提取内嵌预览）与 JPEG。本地调色，或用大模型按你的意图自动出参数。
+        </p>
+      </div>
+
+      <div class="grade-layout">
+        <!-- 上传与预览 -->
+        <div class="grade-stage">
+          <div class="grade-drop" id="gradeDrop">
+            <input type="file" id="gradeFile" accept="image/*,.arw,.cr2,.cr3,.nef,.dng,.orf,.raf,.rw2,.pef,.srw,.raw" hidden />
+            <div class="grade-empty" id="gradeEmpty">
+              <div class="upload-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 64" width="48" height="48">
+                  <rect x="6" y="12" width="52" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 42 L24 28 L34 36 L42 24 L52 36" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="22" cy="22" r="4" fill="currentColor"/>
+                </svg>
+              </div>
+              <p class="upload-title">拖入 RAW / 照片开始调色</p>
+              <p class="upload-sub">ARW · CR2 · NEF · DNG · JPG · PNG · WebP</p>
+              <button class="btn btn-primary" id="gradePickBtn" type="button">选择文件</button>
+            </div>
+            <div class="grade-preview hidden" id="gradePreview">
+              <div class="compare-wrap">
+                <canvas id="gradeCanvas"></canvas>
+                <div class="compare-badge" id="compareBadge">效果预览</div>
+              </div>
+              <div class="grade-meta-bar">
+                <span class="mono" id="gradeMeta">—</span>
+                <div class="grade-meta-actions">
+                  <button class="btn btn-ghost" id="toggleCompareBtn" type="button">对比原图</button>
+                  <button class="btn btn-ghost" id="exportBtn" type="button">导出 JPEG</button>
+                  <button class="btn btn-ghost" id="gradeResetFileBtn" type="button">换一张</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 控制面板 -->
+        <aside class="grade-panel">
+          <div class="gp-block">
+            <h3>风格预设</h3>
+            <div class="preset-grid" id="presetGrid"></div>
+          </div>
+
+          <div class="gp-block">
+            <div class="gp-head">
+              <h3>手动调色</h3>
+              <button class="btn btn-ghost" id="resetGradeBtn" type="button">归零</button>
+            </div>
+            <div class="slider-list" id="sliderList"></div>
+          </div>
+
+          <div class="gp-block ai-block">
+            <h3>AI 调色 <span class="badge">可选</span></h3>
+            <p class="gp-hint">描述你想要的效果，大模型返回调色参数（图片以缩略图发送到你配置的厂商）。</p>
+            <textarea id="aiIntent" class="ai-textarea" rows="3" placeholder="例如：日系清冷、皮肤通透、背景压暗、电影青橙…"></textarea>
+            <div class="ai-actions">
+              <button class="btn btn-primary" id="aiGradeBtn" type="button">AI 生成参数</button>
+              <button class="btn btn-secondary" id="aiToggleCfg" type="button">厂商设置</button>
+            </div>
+            <div class="ai-config hidden" id="aiConfig">
+              <label class="cfg-row">
+                <span>厂商</span>
+                <select id="llmVendor"></select>
+              </label>
+              <label class="cfg-row">
+                <span>模型</span>
+                <input id="llmModel" type="text" placeholder="选择或输入模型名" list="llmModelList" />
+                <datalist id="llmModelList"></datalist>
+              </label>
+              <label class="cfg-row">
+                <span>Base URL</span>
+                <input id="llmBaseUrl" type="text" placeholder="https://api..." />
+              </label>
+              <label class="cfg-row">
+                <span>API Key</span>
+                <input id="llmApiKey" type="password" placeholder="仅保存在本机浏览器" />
+              </label>
+              <button class="btn btn-secondary" id="saveLlmBtn" type="button">保存配置</button>
+              <p class="cfg-note" id="llmStatus">配置只存在你的浏览器 localStorage，不会上传到本站服务器。</p>
+            </div>
+            <div class="ai-result hidden" id="aiResult">
+              <h4>AI 建议</h4>
+              <p id="aiResultText">—</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     <!-- Drills -->
     <section class="section" id="drills">
       <div class="section-head">
@@ -297,6 +395,8 @@
   </footer>
 
   <script src="data.js"></script>
+  <script src="raw.js"></script>
+  <script src="colorgrade.js"></script>
   <script src="analyze.js"></script>
   <script src="app.js"></script>
 </body>

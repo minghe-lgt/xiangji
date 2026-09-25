@@ -483,6 +483,388 @@ function setupUpload() {
   });
 }
 
+/* ========== Color Grading Studio ========== */
+const GRADE_SLIDERS = [
+  { key: "exposure", name: "曝光", min: -200, max: 200, scale: 100 },
+  { key: "contrast", name: "对比度", min: -100, max: 100, scale: 1 },
+  { key: "highlights", name: "高光", min: -100, max: 100, scale: 1 },
+  { key: "shadows", name: "阴影", min: -100, max: 100, scale: 1 },
+  { key: "whites", name: "白色", min: -100, max: 100, scale: 1 },
+  { key: "blacks", name: "黑色", min: -100, max: 100, scale: 1 },
+  { key: "temp", name: "色温", min: -100, max: 100, scale: 1 },
+  { key: "tint", name: "色调", min: -100, max: 100, scale: 1 },
+  { key: "vibrance", name: "自然饱和", min: -100, max: 100, scale: 1 },
+  { key: "saturation", name: "饱和度", min: -100, max: 100, scale: 1 },
+  { key: "clarity", name: "清晰度", min: -100, max: 100, scale: 1 },
+  { key: "fade", name: "褪色", min: 0, max: 100, scale: 1 },
+  { key: "vignette", name: "暗角", min: 0, max: 100, scale: 1 },
+];
+
+let gradeState = {
+  sourceCanvas: null,
+  params: { ...DEFAULT_GRADE },
+  showingOriginal: false,
+  activePreset: null,
+};
+
+function setupGrade() {
+  const drop = $("#gradeDrop");
+  const fileInput = $("#gradeFile");
+  const gradeEmpty = $("#gradeEmpty");
+  const gradePreview = $("#gradePreview");
+  const gradeCanvas = $("#gradeCanvas");
+
+  // presets
+  $("#presetGrid").innerHTML = GRADE_PRESETS.map(
+    (p) => `
+    <button class="preset-btn" type="button" data-preset="${p.id}">
+      <strong>${p.name}</strong>
+      <span>${p.desc}</span>
+    </button>
+  `
+  ).join("");
+
+  $("#presetGrid").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-preset]");
+    if (!btn || !gradeState.sourceCanvas) {
+      if (btn && !gradeState.sourceCanvas) alert("请先载入一张照片");
+      return;
+    }
+    const preset = GRADE_PRESETS.find((p) => p.id === btn.dataset.preset);
+    if (!preset) return;
+
+    if (preset.params === "AUTO") {
+      const meta = estimateMetaFromCanvas(gradeState.sourceCanvas);
+      gradeState.params = autoGradeFromHistogram(null, meta);
+    } else {
+      gradeState.params = { ...preset.params };
+    }
+    gradeState.activePreset = preset.id;
+    gradeState.showingOriginal = false;
+    renderSliders();
+    repaintGrade();
+    $$("#presetGrid .preset-btn").forEach((el) => {
+      el.classList.toggle("active", el.dataset.preset === preset.id);
+    });
+  });
+
+  // sliders
+  renderSliders();
+  bindSliders();
+  $("#resetGradeBtn").addEventListener("click", () => {
+    gradeState.params = { ...DEFAULT_GRADE };
+    gradeState.activePreset = null;
+    $$("#presetGrid .preset-btn").forEach((el) => el.classList.remove("active"));
+    renderSliders();
+    repaintGrade();
+  });
+
+  // file
+  $("#gradePickBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+  gradeEmpty.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) handleGradeFile(f);
+  });
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+    })
+  );
+  drop.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleGradeFile(f);
+  });
+
+  $("#gradeResetFileBtn").addEventListener("click", () => {
+    gradeEmpty.classList.remove("hidden");
+    gradePreview.classList.add("hidden");
+    fileInput.value = "";
+    gradeState.sourceCanvas = null;
+    gradeState.params = { ...DEFAULT_GRADE };
+  });
+
+  // compare hold
+  const compareBtn = $("#toggleCompareBtn");
+  const showOriginal = (on) => {
+    if (!gradeState.sourceCanvas) return;
+    gradeState.showingOriginal = on;
+    $("#compareBadge").textContent = on ? "原图" : "效果预览";
+    repaintGrade();
+  };
+  compareBtn.addEventListener("mousedown", () => showOriginal(true));
+  compareBtn.addEventListener("mouseup", () => showOriginal(false));
+  compareBtn.addEventListener("mouseleave", () => showOriginal(false));
+  compareBtn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    showOriginal(true);
+  });
+  compareBtn.addEventListener("touchend", () => showOriginal(false));
+
+  $("#exportBtn").addEventListener("click", async () => {
+    if (!gradeState.sourceCanvas) return;
+    const blob = await exportCanvasJPEG(gradeCanvas, 0.92);
+    if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.jpg`);
+  });
+
+  // LLM config
+  const vendorSel = $("#llmVendor");
+  vendorSel.innerHTML = LLM_VENDORS.map((v) => `<option value="${v.id}">${v.name}</option>`).join("");
+  const cfg = loadLLMConfig();
+  if (cfg.vendorId) vendorSel.value = cfg.vendorId;
+  if (cfg.model) $("#llmModel").value = cfg.model;
+  if (cfg.baseUrl) $("#llmBaseUrl").value = cfg.baseUrl;
+  if (cfg.apiKey) $("#llmApiKey").value = cfg.apiKey;
+
+  function syncModelList() {
+    const v = LLM_VENDORS.find((x) => x.id === vendorSel.value) || LLM_VENDORS[0];
+    $("#llmModelList").innerHTML = v.models.map((m) => `<option value="${m}">`).join("");
+    if (!$("#llmModel").value && v.models[0]) $("#llmModel").value = v.models[0];
+    if (v.baseUrl && !$("#llmBaseUrl").value) $("#llmBaseUrl").value = v.baseUrl;
+    if (v.id !== "custom") $("#llmBaseUrl").value = v.baseUrl;
+  }
+  vendorSel.addEventListener("change", syncModelList);
+  syncModelList();
+
+  $("#aiToggleCfg").addEventListener("click", () => {
+    $("#aiConfig").classList.toggle("hidden");
+  });
+
+  $("#saveLlmBtn").addEventListener("click", () => {
+    const conf = {
+      vendorId: vendorSel.value,
+      model: $("#llmModel").value.trim(),
+      baseUrl: $("#llmBaseUrl").value.trim(),
+      apiKey: $("#llmApiKey").value.trim(),
+    };
+    saveLLMConfig(conf);
+    $("#llmStatus").textContent = "已保存到本机浏览器。";
+    setTimeout(() => {
+      $("#llmStatus").textContent = "配置只存在你的浏览器 localStorage，不会上传到本站服务器。";
+    }, 2500);
+  });
+
+  $("#aiGradeBtn").addEventListener("click", async () => {
+    if (!gradeState.sourceCanvas) {
+      alert("请先载入一张照片");
+      return;
+    }
+    const intent = $("#aiIntent").value.trim();
+    if (!intent) {
+      alert("请先描述你想要的效果");
+      return;
+    }
+    // 保存当前配置
+    saveLLMConfig({
+      vendorId: vendorSel.value,
+      model: $("#llmModel").value.trim(),
+      baseUrl: $("#llmBaseUrl").value.trim(),
+      apiKey: $("#llmApiKey").value.trim(),
+    });
+
+    const btn = $("#aiGradeBtn");
+    const old = btn.textContent;
+    btn.textContent = "生成中…";
+    btn.disabled = true;
+    try {
+      const meta = estimateMetaFromCanvas(gradeState.sourceCanvas);
+      const result = await askLLMGrade(gradeState.sourceCanvas, intent, meta);
+      gradeState.params = { ...result.params };
+      gradeState.activePreset = null;
+      gradeState.showingOriginal = false;
+      renderSliders();
+      repaintGrade();
+      $("#aiResult").classList.remove("hidden");
+      $("#aiResultText").textContent = `${result.vendor} · ${result.model}：${result.text}`;
+      $$("#presetGrid .preset-btn").forEach((el) => el.classList.remove("active"));
+    } catch (err) {
+      $("#aiResult").classList.remove("hidden");
+      $("#aiResultText").textContent = `出错：${err.message || err}`;
+      alert("AI 调色失败：" + (err.message || err));
+    } finally {
+      btn.textContent = old;
+      btn.disabled = false;
+    }
+  });
+}
+
+function estimateMetaFromCanvas(canvas) {
+  const w = Math.min(120, canvas.width);
+  const h = Math.min(120, canvas.height);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(canvas, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  let sum = 0, sum2 = 0, over = 0, under = 0, satSum = 0, r = 0, b = 0;
+  const n = w * h;
+  const hist = new Float64Array(256);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    sum += L;
+    sum2 += L * L;
+    hist[L | 0]++;
+    if (L >= 250) over++;
+    if (L <= 5) under++;
+    r += d[i];
+    b += d[i + 2];
+    const mx = Math.max(d[i], d[i + 1], d[i + 2]);
+    const mn = Math.min(d[i], d[i + 1], d[i + 2]);
+    satSum += mx === 0 ? 0 : (mx - mn) / mx;
+  }
+  const meanL = sum / n;
+  const contrast = Math.sqrt(Math.max(0, sum2 / n - meanL * meanL));
+  let acc = 0, p2 = 0, p98 = 255;
+  for (let i = 0; i < 256; i++) {
+    acc += hist[i];
+    if (acc / n >= 0.02) { p2 = i; break; }
+  }
+  acc = 0;
+  for (let i = 255; i >= 0; i--) {
+    acc += hist[i];
+    if (acc / n >= 0.02) { p98 = i; break; }
+  }
+  return {
+    meanL,
+    contrast,
+    dynamicRange: p98 - p2,
+    overRatio: (over / n) * 100,
+    underRatio: (under / n) * 100,
+    sat: satSum / n,
+    warmth: (r / n - b / n) / 255,
+  };
+}
+
+function renderSliders() {
+  $("#sliderList").innerHTML = GRADE_SLIDERS.map((s) => {
+    const raw = gradeState.params[s.key];
+    const val = Math.round(raw * s.scale);
+    return `
+      <div class="slider-row">
+        <label for="sl-${s.key}">${s.name}</label>
+        <input type="range" id="sl-${s.key}" data-key="${s.key}" data-scale="${s.scale}"
+          min="${s.min}" max="${s.max}" value="${val}" />
+        <span class="val" id="val-${s.key}">${(raw).toFixed(s.scale > 1 ? 2 : 0)}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function bindSliders() {
+  $("#sliderList").addEventListener("input", (e) => {
+    const input = e.target.closest("[data-key]");
+    if (!input) return;
+    const key = input.dataset.key;
+    const scale = Number(input.dataset.scale);
+    const v = Number(input.value) / scale;
+    gradeState.params[key] = v;
+    const valEl = $("#val-" + key);
+    if (valEl) valEl.textContent = v.toFixed(scale > 1 ? 2 : 0);
+    gradeState.showingOriginal = false;
+    $("#compareBadge").textContent = "效果预览";
+    gradeState.activePreset = null;
+    $$("#presetGrid .preset-btn").forEach((el) => el.classList.remove("active"));
+    repaintGrade();
+  });
+}
+
+function repaintGrade() {
+  if (!gradeState.sourceCanvas) return;
+  const target = $("#gradeCanvas");
+  const src = gradeState.sourceCanvas;
+
+  if (gradeState.showingOriginal) {
+    target.width = src.width;
+    target.height = src.height;
+    target.getContext("2d").drawImage(src, 0, 0);
+    return;
+  }
+
+  // 限制预览尺寸，保证流畅
+  const maxSide = 1400;
+  let sw = src.width;
+  let sh = src.height;
+  if (Math.max(sw, sh) > maxSide) {
+    const s = maxSide / Math.max(sw, sh);
+    sw = Math.round(sw * s);
+    sh = Math.round(sh * s);
+  }
+
+  const work = document.createElement("canvas");
+  work.width = sw;
+  work.height = sh;
+  work.getContext("2d").drawImage(src, 0, 0, sw, sh);
+
+  const graded = applyGrade(work, gradeState.params);
+  target.width = graded.width;
+  target.height = graded.height;
+  target.getContext("2d").drawImage(graded, 0, 0);
+}
+
+async function handleGradeFile(file) {
+  try {
+    const loaded = await loadPhotoFile(file);
+    const img = loaded.img;
+
+    // 全分辨率源（限制最长边 2400 以免内存爆）
+    const maxSide = 2400;
+    let w = img.naturalWidth;
+    let h = img.naturalHeight;
+    if (Math.max(w, h) > maxSide) {
+      const s = maxSide / Math.max(w, h);
+      w = Math.round(w * s);
+      h = Math.round(h * s);
+    }
+    const src = document.createElement("canvas");
+    src.width = w;
+    src.height = h;
+    src.getContext("2d").drawImage(img, 0, 0, w, h);
+
+    gradeState.sourceCanvas = src;
+    gradeState.params = { ...DEFAULT_GRADE };
+    gradeState.activePreset = null;
+    gradeState.showingOriginal = false;
+
+    $("#gradeEmpty").classList.add("hidden");
+    $("#gradePreview").classList.remove("hidden");
+    $("#gradeMeta").textContent = loaded.note || `${file.name}`;
+    $("#compareBadge").textContent = "效果预览";
+    $$("#presetGrid .preset-btn").forEach((el) => el.classList.remove("active"));
+    renderSliders();
+    repaintGrade();
+
+    // 默认跑一次自动校正，方便上手
+    const meta = estimateMetaFromCanvas(src);
+    gradeState.params = autoGradeFromHistogram(null, meta);
+    gradeState.activePreset = "auto";
+    $$("#presetGrid .preset-btn").forEach((el) => el.classList.toggle("active", el.dataset.preset === "auto"));
+    renderSliders();
+    repaintGrade();
+
+    if (loaded.cleanup) {
+      // 保留 img 引用已绘制，可释放 blob URL
+      loaded.cleanup();
+    }
+  } catch (err) {
+    alert(err.message || String(err));
+  }
+}
+
 /* ========== Boot ========== */
 function init() {
   renderPath();
@@ -494,6 +876,7 @@ function init() {
   renderCheats();
   renderJournal();
   setupUpload();
+  setupGrade();
 
   $("#clearJournalBtn").addEventListener("click", () => {
     if (!confirm("确定清空练习记录？")) return;
