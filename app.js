@@ -1440,6 +1440,226 @@ function setupCompare() {
   });
 }
 
+/* ========== Ability Assessment ========== */
+const assessState = {
+  answers: {},
+  photos: [], // File[]
+  results: [], // analyzeImage results
+};
+
+function setupAssessment() {
+  const list = $("#quizList");
+  if (!list) return;
+
+  function renderQuiz() {
+    list.innerHTML = QUIZ_BANK.map(
+      (q) => `
+      <div class="quiz-card" data-qid="${q.id}">
+        <div class="q-meta">Q${q.id} · ${QUIZ_DIMENSIONS[q.dim].name} · ${"★".repeat(q.level)}</div>
+        <p class="q-text">${q.q}</p>
+        <div class="quiz-opts">
+          ${q.options
+            .map(
+              (opt, i) => `
+            <label class="quiz-opt ${assessState.answers[q.id] === i ? "selected" : ""}">
+              <input type="radio" name="q${q.id}" value="${i}" ${assessState.answers[q.id] === i ? "checked" : ""} />
+              <span>${"ABCD"[i]}. ${opt}</span>
+            </label>
+          `
+            )
+            .join("")}
+        </div>
+      </div>
+    `
+    ).join("");
+    updateQuizProgress();
+  }
+
+  function updateQuizProgress() {
+    const n = Object.keys(assessState.answers).length;
+    $("#quizProgress").textContent = `${n} / ${QUIZ_BANK.length}`;
+  }
+
+  list.addEventListener("change", (e) => {
+    const input = e.target.closest("input[type=radio]");
+    if (!input) return;
+    const card = input.closest("[data-qid]");
+    const qid = Number(card.dataset.qid);
+    assessState.answers[qid] = Number(input.value);
+    card.querySelectorAll(".quiz-opt").forEach((el) => el.classList.remove("selected"));
+    input.closest(".quiz-opt").classList.add("selected");
+    updateQuizProgress();
+  });
+
+  $("#quizResetBtn").addEventListener("click", () => {
+    assessState.answers = {};
+    renderQuiz();
+    $("#assessPhotoWrap").classList.add("hidden");
+    $("#assessReport").classList.add("hidden");
+    $("#assessQuizWrap").classList.remove("hidden");
+  });
+
+  $("#quizSubmitBtn").addEventListener("click", () => {
+    const n = Object.keys(assessState.answers).length;
+    if (n < QUIZ_BANK.length) {
+      if (!confirm(`还有 ${QUIZ_BANK.length - n} 题未作答，仍要继续吗？未答题按错题计。`)) return;
+    }
+    $("#assessPhotoWrap").classList.remove("hidden");
+    $("#assessPhotoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  // photos
+  const drop = $("#assessDrop");
+  const fileInput = $("#assessFiles");
+
+  $("#assessPickBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", () => handleAssessFiles(fileInput.files));
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+    })
+  );
+  drop.addEventListener("drop", (e) => handleAssessFiles(e.dataTransfer.files));
+
+  function handleAssessFiles(fileList) {
+    const imgs = [...fileList].filter((f) => f.type.startsWith("image/")).slice(0, 3);
+    assessState.photos = imgs;
+    $("#assessPhotoStatus").textContent = imgs.length ? `已选 ${imgs.length} 张` : "未选择";
+    $("#assessThumbs").innerHTML = imgs
+      .map((f) => `<img src="${URL.createObjectURL(f)}" alt="" />`)
+      .join("");
+  }
+
+  async function analyzeAssessPhotos() {
+    assessState.results = [];
+    for (const f of assessState.photos) {
+      try {
+        const loaded = await loadPhotoFile(f);
+        const result = analyzeImage(loaded.img);
+        assessState.results.push(result);
+        if (loaded.cleanup) loaded.cleanup();
+      } catch (e) {
+        console.warn("assess photo fail", e);
+      }
+    }
+    return assessState.results;
+  }
+
+  function renderReport(report) {
+    assessState._lastStartWeek = report.startWeek;
+    $("#assessReport").classList.remove("hidden");
+    $("#reportCombined").textContent = String(report.combined);
+    $("#reportLevel").textContent = `水平判断：${report.level}`;
+    $("#reportStart").innerHTML =
+      report.combined >= 85
+        ? `基础很稳，建议直接进入 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong>（题材/进阶）打磨。`
+        : `建议从 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong> 开始补齐；也可按下面优先级从弱项攻。`;
+    $("#reportMeta").textContent = `答题 ${report.quizCorrect}/${report.quizTotal}（${report.quizAvg} 分）` +
+      (report.hasPhotos ? ` · 作品均分 ${report.photoAvg}` : " · 未提供作品");
+
+    $("#reportDims").innerHTML = Object.entries(report.dimScores)
+      .map(([k, v]) => {
+        const name = QUIZ_DIMENSIONS[k] ? QUIZ_DIMENSIONS[k].name : k;
+        return `
+        <div class="report-dim">
+          <div class="name">${name}</div>
+          <div class="num">${v}</div>
+          <div class="bar"><i style="width:${v}%"></i></div>
+        </div>
+      `;
+      })
+      .join("");
+
+    $("#reportGaps").innerHTML = report.gaps
+      .map(
+        (g) => `
+      <div class="gap-card">
+        <strong>${g.title}</strong>
+        <p>${g.advice}</p>
+        <span class="weeks">对应课程：${g.weeks}</span>
+      </div>
+    `
+      )
+      .join("");
+
+    $("#reportWrong").innerHTML = report.wrong.length
+      ? report.wrong
+          .map(
+            (w) => `
+      <div class="wrong-item">
+        <div class="wq">[${w.dim}] ${w.q}</div>
+        <div class="we">${w.explain}</div>
+      </div>
+    `
+          )
+          .join("")
+      : `<p class="calc-note" style="color:#8a7d6c">全部答对，很稳！</p>`;
+
+    $("#assessReport").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function runReport() {
+    const btn = $("#assessRunBtn");
+    btn.disabled = true;
+    btn.textContent = "分析中…";
+    try {
+      await analyzeAssessPhotos();
+      const report = buildAssessment({
+        quizAnswers: assessState.answers,
+        photoResults: assessState.results,
+      });
+      renderReport(report);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "生成诊断报告";
+    }
+  }
+
+  $("#assessRunBtn").addEventListener("click", runReport);
+  $("#assessSkipBtn").addEventListener("click", async () => {
+    assessState.photos = [];
+    assessState.results = [];
+    await runReport();
+  });
+
+  $("#reportRetry").addEventListener("click", () => {
+    assessState.answers = {};
+    assessState.photos = [];
+    assessState.results = [];
+    $("#assessReport").classList.add("hidden");
+    $("#assessPhotoWrap").classList.add("hidden");
+    $("#assessQuizWrap").classList.remove("hidden");
+    $("#assessQuizWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+    renderQuiz();
+    $("#assessPhotoStatus").textContent = "未选择";
+    $("#assessThumbs").innerHTML = "";
+  });
+
+  $("#reportGoPlan").addEventListener("click", () => {
+    // 高亮推荐周
+    setTimeout(() => {
+      const week = document.querySelector(`[data-week="${assessState._lastStartWeek || 1}"]`);
+      if (week) {
+        week.classList.add("open");
+        week.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 400);
+  });
+
+  renderQuiz();
+}
+
 /* ========== Boot ========== */
 function init() {
   renderPath();
@@ -1457,6 +1677,7 @@ function init() {
   setupModeSwitch();
   setupWatermark();
   setupCompare();
+  setupAssessment();
 
   $("#clearJournalBtn").addEventListener("click", () => {
     if (!confirm("确定清空练习记录？")) return;

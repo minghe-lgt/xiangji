@@ -28,7 +28,8 @@
     </div>
     <nav class="nav" id="mainNav">
       <a href="#plan" data-group="learn">训练体系</a>
-      <a href="#analyze" data-group="tool">照片分析</a>
+      <a href="#assess" data-group="learn">能力诊断</a>
+      <a href="#analyze" data-group="learn">照片分析</a>
       <a href="#grade" data-group="tool">调色</a>
       <a href="#tools" data-group="tool">拍摄计算</a>
       <a href="#watermark" data-group="tool">水印 / 对比</a>
@@ -129,8 +130,82 @@
       <div class="stage-blocks" id="stageBlocks"></div>
     </section>
 
+    <!-- Ability Assessment -->
+    <section class="section section-alt" id="assess" data-group="learn">
+      <div class="section-head">
+        <p class="eyebrow">ABILITY CHECK</p>
+        <h2>能力诊断 · 定位从哪补</h2>
+        <p class="section-desc">
+          18 道题覆盖曝光 / 景深 / 构图 / 用光 / 色彩 / 方法，再配合 2–3 张你的作品，给出起点周次与补齐清单。
+        </p>
+      </div>
+
+      <!-- Step 1: Quiz -->
+      <div class="assess-step" id="assessQuizWrap">
+        <div class="assess-head">
+          <h3>第一步 · 答题 <span class="mono" id="quizProgress">0 / 18</span></h3>
+          <p class="calc-note">单选。凭第一反应即可，不用翻书。</p>
+        </div>
+        <div class="quiz-list-wrap" id="quizList"></div>
+        <div class="assess-actions">
+          <button class="btn btn-primary" id="quizSubmitBtn" type="button">提交答题</button>
+          <button class="btn btn-ghost" id="quizResetBtn" type="button">重新作答</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Photos -->
+      <div class="assess-step hidden" id="assessPhotoWrap">
+        <div class="assess-head">
+          <h3>第二步 · 上传 2–3 张作品 <span class="mono">可跳过</span></h3>
+          <p class="calc-note">用现成的作品即可，分析在本地完成。跳过则只按答题推荐。</p>
+        </div>
+        <div class="assess-photo-row" id="assessDrop">
+          <input type="file" id="assessFiles" accept="image/*" multiple hidden />
+          <button class="btn btn-secondary" id="assessPickBtn" type="button">选择照片</button>
+          <span class="mono" id="assessPhotoStatus">未选择</span>
+        </div>
+        <div class="assess-thumbs" id="assessThumbs"></div>
+        <div class="assess-actions">
+          <button class="btn btn-primary" id="assessRunBtn" type="button">生成诊断报告</button>
+          <button class="btn btn-ghost" id="assessSkipBtn" type="button">跳过照片，直接出报告</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Report -->
+      <div class="assess-report hidden" id="assessReport">
+        <div class="report-hero">
+          <div class="report-score">
+            <strong id="reportCombined">0</strong>
+            <span>综合能力分</span>
+          </div>
+          <div class="report-summary">
+            <h3 id="reportLevel">—</h3>
+            <p id="reportStart">—</p>
+            <p class="calc-note" id="reportMeta">—</p>
+          </div>
+        </div>
+
+        <div class="report-dims" id="reportDims"></div>
+
+        <div class="report-block">
+          <h4>建议补齐 · 优先级从高到低</h4>
+          <div class="report-gaps" id="reportGaps"></div>
+        </div>
+
+        <div class="report-block">
+          <h4>错题回顾</h4>
+          <div class="report-wrong" id="reportWrong"></div>
+        </div>
+
+        <div class="assess-actions">
+          <a class="btn btn-primary" href="#plan" id="reportGoPlan">去训练计划</a>
+          <button class="btn btn-ghost" id="reportRetry" type="button">再测一次</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Photo Analysis -->
-    <section class="section section-alt" id="analyze" data-group="tool">
+    <section class="section section-alt" id="analyze" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">COMPOSITION LAB · PRO</p>
         <h2>上传照片 · 六维专业分析</h2>
@@ -662,6 +737,7 @@
   <script src="colorgrade.js"></script>
   <script src="organize.js"></script>
   <script src="tools.js"></script>
+  <script src="quiz.js"></script>
   <script src="analyze.js"></script>
   <script src="app.js"></script>
 </body>
