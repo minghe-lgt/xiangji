@@ -199,12 +199,40 @@ const QUIZ_BANK = [
   },
 ];
 
-/** 诊断报告：结合答题 + 照片分析
+/**
+ * 能力诊断 — 题库 + 作品基线 + 起点推荐
+ * 作品只做「首次定性基线」；日常再测只跑题库，分数与已存基线融合。
  * answer 约定：0-3 = 选项 A-D；-1 = 不懂（知识缺口，不算猜错）
  */
-function buildAssessment({ quizAnswers, photoResults }) {
-  // quiz: { [questionId]: optionIndex | -1 }
+const BASELINE_STORE_KEY = "lightjournal.baseline";
+
+function loadBaseline() {
+  try {
+    return JSON.parse(localStorage.getItem(BASELINE_STORE_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveBaseline(data) {
+  localStorage.setItem(
+    BASELINE_STORE_KEY,
+    JSON.stringify({ ...data, savedAt: new Date().toISOString() })
+  );
+}
+
+function clearBaseline() {
+  localStorage.removeItem(BASELINE_STORE_KEY);
+}
+
+function buildAssessment({ quizAnswers, photoResults, baseline }) {
   const UNKNOWN = -1;
+  const livePhotos = photoResults && photoResults.length ? photoResults : null;
+  const useBaseline = baseline || (livePhotos ? null : loadBaseline());
+
+  // 若本次传了新照片（建基线），优先用本次；否则用历史基线
+  const photoSource = livePhotos ? { type: "live", results: livePhotos } : useBaseline ? { type: "stored", baseline: useBaseline } : null;
+
   const dimStats = {};
   for (const key of Object.keys(QUIZ_DIMENSIONS)) {
     dimStats[key] = { correct: 0, wrong: 0, unknown: 0, total: 0, name: QUIZ_DIMENSIONS[key].name };
@@ -217,11 +245,7 @@ function buildAssessment({ quizAnswers, photoResults }) {
     const pick = quizAnswers[q.id];
     const d = dimStats[q.dim];
     d.total++;
-    if (pick === undefined || pick === null) {
-      // 未答视为不懂
-      d.unknown++;
-      unknown++;
-    } else if (pick === UNKNOWN) {
+    if (pick === undefined || pick === null || pick === UNKNOWN) {
       d.unknown++;
       unknown++;
     } else if (pick === q.answer) {
@@ -233,7 +257,6 @@ function buildAssessment({ quizAnswers, photoResults }) {
     }
   }
 
-  // 维度分：正确率给分；「不懂」按 40% 折算（比猜错温和，但反映缺口）
   const dimScores = {};
   for (const [k, v] of Object.entries(dimStats)) {
     if (!v.total) {
@@ -244,7 +267,7 @@ function buildAssessment({ quizAnswers, photoResults }) {
     dimScores[k] = Math.round(score * 100);
   }
 
-  // 照片维度合并：去掉最高/最低 15% 后取均值，减少单张废片/神片干扰
+  // 照片维度
   const photoAgg = {
     composition: 0,
     exposure: 0,
@@ -253,9 +276,12 @@ function buildAssessment({ quizAnswers, photoResults }) {
     sharpness: 0,
     balance: 0,
   };
-  if (photoResults && photoResults.length) {
+  let photoAvg = null;
+
+  if (photoSource && photoSource.type === "live") {
+    const results = photoSource.results;
     for (const key of Object.keys(photoAgg)) {
-      const vals = photoResults
+      const vals = results
         .map((p) => {
           const d = (p.dims || []).find((x) => x.key === key);
           return d ? d.score : null;
@@ -264,13 +290,13 @@ function buildAssessment({ quizAnswers, photoResults }) {
         .sort((a, b) => a - b);
       photoAgg[key] = trimmedMean(vals);
     }
+    photoAvg = trimmedMean(results.map((p) => p.overall).sort((a, b) => a - b));
+  } else if (photoSource && photoSource.type === "stored") {
+    Object.assign(photoAgg, photoSource.baseline.photoAgg || {});
+    photoAvg = photoSource.baseline.photoAvg ?? null;
   }
 
-  const hasPhotos = photoResults && photoResults.length > 0;
-
-  const photoAvg = hasPhotos
-    ? trimmedMean(photoResults.map((p) => p.overall).sort((a, b) => a - b))
-    : null;
+  const hasPhotos = photoSource != null;
 
   // 综合能力：题 55% + 照片 45%（有照片时）
   function blend(quizScore, photoScore) {
@@ -363,6 +389,8 @@ function buildAssessment({ quizAnswers, photoResults }) {
     dimScores: overallMap,
     photoAgg,
     hasPhotos,
+    baselineUsed: photoSource ? photoSource.type : null, // live | stored | null
+    photoCount: livePhotos ? livePhotos.length : useBaseline ? useBaseline.photoCount || 0 : 0,
     startWeek,
     gaps,
     wrong: [...wrongList, ...unknownList],

@@ -1498,18 +1498,38 @@ function setupAssessment() {
   $("#quizResetBtn").addEventListener("click", () => {
     assessState.answers = {};
     renderQuiz();
-    $("#assessPhotoWrap").classList.add("hidden");
     $("#assessReport").classList.add("hidden");
     $("#assessQuizWrap").classList.remove("hidden");
   });
 
+  async function runReport(fromBaseline) {
+    const btn = $("#quizSubmitBtn");
+    const oldText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "出分中…";
+    try {
+      // 日常出分：不再分析照片，融合已存的作品基线
+      const report = buildAssessment({
+        quizAnswers: assessState.answers,
+        photoResults: null,
+        baseline: loadBaseline(),
+      });
+      renderReport(report);
+      $("#assessReport").classList.remove("hidden");
+      $("#assessQuizWrap").classList.add("hidden");
+      $("#assessPhotoWrap").classList.add("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = oldText;
+    }
+  }
+
   $("#quizSubmitBtn").addEventListener("click", () => {
     const n = Object.keys(assessState.answers).length;
     if (n < QUIZ_BANK.length) {
-      if (!confirm(`还有 ${QUIZ_BANK.length - n} 题未作答（未答按「不懂」计）。仍要继续吗？`)) return;
+      if (!confirm(`还有 ${QUIZ_BANK.length - n} 题未作答（未答按「不懂」计）。仍要出分吗？`)) return;
     }
-    $("#assessPhotoWrap").classList.remove("hidden");
-    $("#assessPhotoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+    runReport(false);
   });
 
   // Modal open/close
@@ -1599,10 +1619,13 @@ function setupAssessment() {
       report.combined >= 85
         ? `基础很稳，建议直接进入 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong>（题材/进阶）打磨。`
         : `建议从 <strong>Week ${String(report.startWeek).padStart(2, "0")}</strong> 开始补齐；也可按下面优先级从弱项攻。`;
-    $("#reportMeta").textContent = `答题 正确 ${report.quizCorrect} · 猜错 ${report.quizWrong} · 不懂 ${report.quizUnknown}（满分 ${report.quizTotal}）` +
-      (report.hasPhotos
-        ? ` · 作品 ${assessState.results.length} 张均分 ${report.photoAvg}`
-        : " · 未提供作品");
+    $("#reportMeta").textContent =
+      `答题 正确 ${report.quizCorrect} · 猜错 ${report.quizWrong} · 不懂 ${report.quizUnknown}（满分 ${report.quizTotal}）` +
+      (report.baselineUsed === "stored"
+        ? ` · 已融合作品基线（${report.photoCount} 张均分 ${report.photoAvg}）`
+        : report.baselineUsed === "live"
+          ? ` · 本次作品 ${report.photoCount} 张均分 ${report.photoAvg}`
+          : " · 尚无作品基线（可在上方建立一次）");
 
     $("#reportDims").innerHTML = Object.entries(report.dimScores)
       .map(([k, v]) => {
@@ -1645,41 +1668,68 @@ function setupAssessment() {
     $("#assessReport").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  async function runReport() {
+  function refreshBaselineBadge() {
+    const b = loadBaseline();
+    const badge = $("#baselineBadge");
+    if (!badge) return;
+    if (b && b.photoAvg != null) {
+      const when = b.savedAt ? new Date(b.savedAt).toLocaleDateString("zh-CN") : "";
+      badge.textContent = `已建立 · ${b.photoCount || "?"} 张 · 均分 ${b.photoAvg}${when ? " · " + when : ""}`;
+    } else {
+      badge.textContent = "未建立";
+    }
+  }
+
+  // 作品定性：仅建立/更新基线
+  $("#assessRunBtn").addEventListener("click", async () => {
+    if (!assessState.photos.length) {
+      alert("请先选择 10–20 张照片");
+      return;
+    }
     const btn = $("#assessRunBtn");
     btn.disabled = true;
     btn.textContent = "分析中…";
     try {
       await analyzeAssessPhotos();
-      const report = buildAssessment({
-        quizAnswers: assessState.answers,
+      if (!assessState.results.length) {
+        alert("没有成功分析任何照片");
+        return;
+      }
+      // 稳健统计后写入基线
+      const tmp = buildAssessment({
+        quizAnswers: {},
         photoResults: assessState.results,
+        baseline: null,
       });
-      renderReport(report);
+      saveBaseline({
+        photoAgg: tmp.photoAgg,
+        photoAvg: tmp.photoAvg,
+        photoCount: assessState.results.length,
+        savedAt: new Date().toISOString(),
+      });
+      refreshBaselineBadge();
+      alert(`作品基线已建立：${assessState.results.length} 张，均分 ${tmp.photoAvg}。之后再测只跑题目。`);
     } finally {
       btn.disabled = false;
-      btn.textContent = "生成诊断报告";
+      btn.textContent = "建立作品基线";
     }
-  }
+  });
 
-  $("#assessRunBtn").addEventListener("click", runReport);
-  $("#assessSkipBtn").addEventListener("click", async () => {
-    assessState.photos = [];
-    assessState.results = [];
-    await runReport();
+  $("#assessSkipBtn").addEventListener("click", () => {
+    if (!Object.keys(assessState.answers).length) {
+      alert("请先答题，或点「建立作品基线」");
+      return;
+    }
+    runReport(false);
   });
 
   $("#reportRetry").addEventListener("click", () => {
     assessState.answers = {};
-    assessState.photos = [];
-    assessState.results = [];
     $("#assessReport").classList.add("hidden");
-    $("#assessPhotoWrap").classList.add("hidden");
     $("#assessQuizWrap").classList.remove("hidden");
     $("#assessQuizWrap").scrollIntoView({ behavior: "smooth", block: "start" });
     renderQuiz();
-    $("#assessPhotoStatus").textContent = "未选择";
-    $("#assessThumbs").innerHTML = "";
+    refreshBaselineBadge();
   });
 
   $("#reportGoPlan").addEventListener("click", () => {
@@ -1693,6 +1743,7 @@ function setupAssessment() {
     }
   });
 
+  refreshBaselineBadge();
   renderQuiz();
 }
 

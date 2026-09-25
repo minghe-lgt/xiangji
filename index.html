@@ -137,32 +137,34 @@
           <div>
             <p class="eyebrow">ABILITY CHECK</p>
             <h2>能力诊断 · 定位从哪补</h2>
-            <p class="section-desc">18 题 + 可选 10–20 张作品，做完直接出分数与起点推荐。</p>
+            <p class="section-desc">平时做题出分即可；上传作品只做<strong>一次</strong>「首次定性」基线，之后不会再要求传图。</p>
           </div>
           <button class="btn btn-ghost" id="closeAssessBtn" type="button" aria-label="关闭">关闭</button>
         </header>
 
         <div class="assess-modal-body">
-          <!-- Step 1: Quiz -->
+          <!-- Step 1: Quiz only -->
           <div class="assess-step" id="assessQuizWrap">
             <div class="assess-head">
-              <h3>第一步 · 答题 <span class="mono" id="quizProgress">0 / 18</span></h3>
+              <h3>能力小测 · 答题 <span class="mono" id="quizProgress">0 / 18</span></h3>
               <p class="calc-note quiz-tip">
                 单选，凭第一反应。<strong>不懂就选「不懂」，不要硬猜</strong>——选不懂按知识缺口统计，不按错题计。
               </p>
             </div>
             <div class="quiz-list-wrap" id="quizList"></div>
             <div class="assess-actions">
-              <button class="btn btn-primary" id="quizSubmitBtn" type="button">提交答题</button>
+              <button class="btn btn-primary" id="quizSubmitBtn" type="button">提交并出分</button>
               <button class="btn btn-ghost" id="quizResetBtn" type="button">重新作答</button>
             </div>
           </div>
 
-          <!-- Step 2: Photos -->
-          <div class="assess-step hidden" id="assessPhotoWrap">
+          <!-- Baseline (once) -->
+          <div class="assess-step" id="assessPhotoWrap">
             <div class="assess-head">
-              <h3>第二步 · 上传 10–20 张作品 <span class="mono">可跳过</span></h3>
-              <p class="calc-note">建议按「日常随手拍的真实水平」选片，别只挑最好的。分析在本地完成；跳过则只按答题推荐。</p>
+              <h3>作品定性 · 仅作首次基线 <span class="mono" id="baselineBadge">未建立</span></h3>
+              <p class="calc-note">
+                上传 10–20 张<strong>日常真实水平</strong>的作品，做一次能力「定性」。之后再测只做题，不会再要求传图。
+              </p>
             </div>
             <div class="assess-photo-row" id="assessDrop">
               <input type="file" id="assessFiles" accept="image/*" multiple hidden />
@@ -171,12 +173,12 @@
             </div>
             <div class="assess-thumbs" id="assessThumbs"></div>
             <div class="assess-actions">
-              <button class="btn btn-primary" id="assessRunBtn" type="button">生成诊断报告</button>
-              <button class="btn btn-ghost" id="assessSkipBtn" type="button">跳过照片，直接出报告</button>
+              <button class="btn btn-primary" id="assessRunBtn" type="button">建立作品基线</button>
+              <button class="btn btn-ghost" id="assessSkipBtn" type="button">本次不定性，只看答题</button>
             </div>
           </div>
 
-          <!-- Step 3: Report -->
+          <!-- Report -->
           <div class="assess-report hidden" id="assessReport">
             <div class="report-hero">
               <div class="report-score">
@@ -204,7 +206,7 @@
 
             <div class="assess-actions">
               <button class="btn btn-primary" id="reportGoPlan" type="button">去训练计划</button>
-              <button class="btn btn-ghost" id="reportRetry" type="button">再测一次</button>
+              <button class="btn btn-ghost" id="reportRetry" type="button">再测一次（仅题目）</button>
               <button class="btn btn-ghost" id="reportClose" type="button">关闭</button>
             </div>
           </div>
