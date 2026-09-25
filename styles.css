@@ -1518,6 +1518,237 @@ select { font: inherit; color: inherit; }
   .rule-grid { grid-template-columns: 1fr; }
 }
 
+/* ========== Mode switch ========== */
+.mode-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(240, 233, 222, 0.06);
+  border: 1px solid var(--line);
+  gap: 2px;
+}
+
+.mode-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  transition: all 0.15s;
+}
+
+.mode-btn:hover { color: var(--ink); }
+
+.mode-btn.active {
+  background: var(--accent);
+  color: #1a1408;
+  font-weight: 500;
+}
+
+body.mode-learn [data-group="tool"],
+body.mode-tool [data-group="learn"] {
+  display: none !important;
+}
+
+/* ========== Calculators ========== */
+.calc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.calc-tab {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-mid);
+  font-size: 0.88rem;
+  transition: all 0.15s;
+}
+
+.calc-tab:hover { color: var(--ink); border-color: var(--accent); }
+
+.calc-tab.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.calc-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.calc-card h3 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+}
+
+.calc-note {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+
+.calc-result,
+.dof-out,
+.sun-out {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(212, 160, 84, 0.1);
+  border: 1px solid rgba(212, 160, 84, 0.28);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.85;
+  color: var(--ink);
+}
+
+.dof-out .big,
+.sun-out .big {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--accent);
+}
+
+.sun-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ========== Watermark & Compare ========== */
+.wm-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.wm-block {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.wm-block h3 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+}
+
+.wm-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.wm-drop,
+.cmp-drop {
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  color: var(--ink-mid);
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+.wm-drop.dragover,
+.cmp-drop.dragover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.wm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cmp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cmp-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-soft);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.cmp-card.winner {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  transform: translateY(-2px);
+}
+
+.cmp-card img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  background: #111;
+}
+
+.cmp-card .cmp-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.cmp-card .cmp-foot input {
+  width: 52px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.cmp-card .pick-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-mid);
+  font-size: 0.72rem;
+}
+
+.cmp-card .pick-btn.active {
+  background: var(--accent);
+  color: #1a1408;
+  border-color: var(--accent);
+}
+
+@media (max-width: 980px) {
+  .calc-grid,
+  .wm-layout { grid-template-columns: 1fr; }
+  .mode-switch { order: 10; }
+  .site-header { flex-wrap: wrap; }
+}
+
 /* ========== Drills ========== */
 .drill-grid {
   display: grid;

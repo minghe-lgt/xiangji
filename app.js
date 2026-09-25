@@ -1108,6 +1108,338 @@ async function setupOrganize() {
   });
 }
 
+/* ========== Field Calculators ========== */
+function fillSelect(sel, values, selected) {
+  sel.innerHTML = values
+    .map((v) => `<option value="${v}" ${String(v) === String(selected) ? "selected" : ""}>${v}</option>`)
+    .join("");
+}
+
+function setupCalculators() {
+  // 曝光 selects
+  const expRefN = $("#expRefN");
+  const expRefT = $("#expRefT");
+  const expRefISO = $("#expRefISO");
+  const expN = $("#expN");
+  const expT = $("#expT");
+  const expISO = $("#expISO");
+  if (!expRefN) return;
+
+  fillSelect(expRefN, APERTURES, 2.8);
+  fillSelect(expRefT, SHUTTERS, "1/125");
+  fillSelect(expRefISO, ISOS, 100);
+  fillSelect(expN, APERTURES, 2.8);
+  fillSelect(expT, SHUTTERS, "1/125");
+  fillSelect(expISO, ISOS, 100);
+  fillSelect($("#dofN"), APERTURES, 5.6);
+  fillSelect($("#ndBase"), SHUTTERS, "1/60");
+  fillSelect($("#ndFilter"), Object.keys(ND_STOPS), "ND1000");
+
+  function updateExp() {
+    const refN = Number(expRefN.value);
+    const refT = expRefT.value;
+    const refISO = Number(expRefISO.value);
+    $("#expRefEv").textContent = `EV ≈ ${solveExposure({ aperture: refN, shutter: refT, iso: refISO, lock: "iso" }).ev}`;
+
+    const lock = $("#expLock").value;
+    const N = Number(expN.value);
+    const T = expT.value;
+    const ISO = Number(expISO.value);
+
+    let out = "";
+    if (lock === "iso") {
+      // 改 N 或 T，求 ISO
+      const iso = matchISO(N, T, refN, refT, refISO);
+      expISO.value = String([...ISOS].sort((a, b) => Math.abs(a - iso) - Math.abs(b - iso))[0]);
+      out = `锁 ISO → 光圈 f/${N} 时，快门 ${T} 需要 ISO ≈ <strong>${iso}</strong>`;
+    } else if (lock === "shutter") {
+      const t = matchShutter(N, ISO, refN, refT, refISO);
+      out = `锁快门 → ISO ${ISO} 时，光圈 f/${N} 对应快门 <strong>${t}s</strong>（当前选择 ${T}）`;
+    } else {
+      const n = matchAperture(T, ISO, refN, refT, refISO);
+      out = `锁光圈 → 快门 ${T} / ISO ${ISO} 时，光圈应为 <strong>f/${n}</strong>`;
+    }
+    $("#expResult").innerHTML = out;
+  }
+
+  [expRefN, expRefT, expRefISO, expN, expT, expISO, $("#expLock")].forEach((el) =>
+    el.addEventListener("change", updateExp)
+  );
+  updateExp();
+
+  // DOF
+  function updateDof() {
+    const r = dofCalc({
+      focal: $("#dofFocal").value,
+      aperture: $("#dofN").value,
+      distance: $("#dofDist").value,
+      sensor: $("#dofSensor").value,
+    });
+    const far = r.far === Infinity ? "∞" : r.far.toFixed(2) + " m";
+    const total = r.total === Infinity ? "∞" : r.total.toFixed(2) + " m";
+    $("#dofOut").innerHTML = `
+      <div class="big">超焦距 ${r.hyperfocal.toFixed(2)} m</div>
+      <div>近清晰点：${r.near.toFixed(2)} m</div>
+      <div>远清晰点：${far}</div>
+      <div>景深范围：${total}</div>
+    `;
+  }
+  ["#dofFocal", "#dofN", "#dofDist", "#dofSensor"].forEach((sel) =>
+    $(sel).addEventListener("input", updateDof)
+  );
+  updateDof();
+
+  // ND
+  function updateNd() {
+    const r = ndConvert($("#ndBase").value, ND_STOPS[$("#ndFilter").value] ?? 10);
+    $("#ndOut").innerHTML = `
+      <div class="big">${r.label}</div>
+      <div>${r.friendly}</div>
+      <div>约 ${r.seconds.toFixed(2)} 秒</div>
+    `;
+  }
+  ["#ndBase", "#ndFilter"].forEach((sel) => $(sel).addEventListener("change", updateNd));
+  updateNd();
+
+  // Sun
+  const dateInput = $("#sunDate");
+  if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+
+  function updateSun() {
+    const lat = Number($("#sunLat").value);
+    const lon = Number($("#sunLon").value);
+    const d = new Date(dateInput.value + "T12:00:00");
+    const t = sunTimes(d, lat, lon);
+    if (t.polar) {
+      $("#sunOut").innerHTML = `<div class="big">${t.polar}</div><div>该纬度当日无正常日出日落</div>`;
+      return;
+    }
+    $("#sunOut").innerHTML = `
+      <div class="big">日出 ${fmtTime(t.sunrise)} · 日落 ${fmtTime(t.sunset)}</div>
+      <div>黄金时刻（早）${fmtTime(t.goldenMorning.start)} – ${fmtTime(t.goldenMorning.end)}</div>
+      <div>黄金时刻（晚）${fmtTime(t.goldenEvening.start)} – ${fmtTime(t.goldenEvening.end)}</div>
+      <div>蓝调时刻（早）${fmtTime(t.blueMorning.start)} – ${fmtTime(t.blueMorning.end)}</div>
+      <div>蓝调时刻（晚）${fmtTime(t.blueEvening.start)} – ${fmtTime(t.blueEvening.end)}</div>
+    `;
+  }
+  ["#sunLat", "#sunLon", "#sunDate"].forEach((sel) => $(sel).addEventListener("input", updateSun));
+  $$(".sun-presets [data-loc]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const [la, lo] = btn.dataset.loc.split(",");
+      $("#sunLat").value = la;
+      $("#sunLon").value = lo;
+      updateSun();
+    });
+  });
+  updateSun();
+
+  // calc tabs
+  $("#calcTabs").addEventListener("click", (e) => {
+    const tab = e.target.closest("[data-calc]");
+    if (!tab) return;
+    $$("#calcTabs .calc-tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    $$(".calc-panel").forEach((p) => p.classList.add("hidden"));
+    $("#calc-" + tab.dataset.calc).classList.remove("hidden");
+  });
+}
+
+/* ========== Mode switch ========== */
+function setupModeSwitch() {
+  const box = $("#modeSwitch");
+  if (!box) return;
+  box.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-mode]");
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+    $$(".mode-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    document.body.classList.remove("mode-learn", "mode-tool");
+    if (mode === "learn") document.body.classList.add("mode-learn");
+    if (mode === "tool") document.body.classList.add("mode-tool");
+  });
+}
+
+/* ========== Watermark batch ========== */
+function setupWatermark() {
+  const drop = $("#wmDrop");
+  const input = $("#wmFiles");
+  let files = [];
+
+  function refreshStatus() {
+    $("#wmStatus").textContent = files.length ? `已选 ${files.length} 张` : "未选择文件";
+  }
+
+  $("#wmPickBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    input.click();
+  });
+  drop.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    input.click();
+  });
+  input.addEventListener("change", () => {
+    files = [...input.files];
+    refreshStatus();
+  });
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+    })
+  );
+  drop.addEventListener("drop", (e) => {
+    files = [...(e.dataTransfer.files || [])];
+    refreshStatus();
+  });
+
+  $("#wmRunBtn").addEventListener("click", async () => {
+    if (!files.length) {
+      alert("请先选择图片");
+      return;
+    }
+    const opt = {
+      text: $("#wmText").value || "© 光影手帐",
+      position: $("#wmPos").value,
+      opacity: Number($("#wmOpacity").value) / 100,
+      size: Number($("#wmSize").value) / 1000,
+    };
+    const btn = $("#wmRunBtn");
+    btn.disabled = true;
+    btn.textContent = "处理中…";
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        try {
+          const img = await fileToImage(f);
+          const c = document.createElement("canvas");
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          c.getContext("2d").drawImage(img, 0, 0);
+          applyTextWatermark(c, opt);
+          const blob = await exportCanvasJPEG(c, 0.92);
+          if (img._objectUrl) URL.revokeObjectURL(img._objectUrl);
+          if (blob) {
+            const base = f.name.replace(/\.[^.]+$/, "");
+            downloadBlob(blob, `${base}-wm.jpg`);
+            $("#wmStatus").textContent = `已导出 ${i + 1} / ${files.length}`;
+            await new Promise((r) => setTimeout(r, 180));
+          }
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+      $("#wmStatus").textContent = `完成 ${files.length} 张`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "加水印并导出";
+    }
+  });
+}
+
+/* ========== Compare picker ========== */
+function setupCompare() {
+  const drop = $("#cmpDrop");
+  const input = $("#cmpFiles");
+  const grid = $("#cmpGrid");
+  let items = [];
+  let winnerId = null;
+
+  function render() {
+    grid.innerHTML = items
+      .map(
+        (it) => `
+      <div class="cmp-card ${it.id === winnerId ? "winner" : ""}" data-id="${it.id}">
+        <img src="${it.url}" alt="" />
+        <div class="cmp-foot">
+          <span>${it.name}</span>
+          <input type="number" min="0" max="100" value="${it.score ?? ""}" data-score="${it.id}" placeholder="分" />
+          <button class="pick-btn ${it.id === winnerId ? "active" : ""}" data-pick="${it.id}" type="button">选它</button>
+        </div>
+      </div>
+    `
+      )
+      .join("");
+    const best = items.reduce((a, b) => ((b.score ?? -1) > (a.score ?? -1) ? b : a), items[0] || { score: -1 });
+    $("#cmpStatus").textContent = items.length
+      ? winnerId
+        ? `已选中：${items.find((x) => x.id === winnerId)?.name}`
+        : best && best.score > 0
+          ? `当前最高分：${best.name} (${best.score})`
+          : `已载入 ${items.length} 张，可打分或点「选它」`
+      : "—";
+  }
+
+  function addFiles(fileList) {
+    const list = [...fileList].slice(0, 6);
+    items = list.map((f, i) => ({
+      id: "c" + Date.now() + i,
+      name: f.name.length > 12 ? f.name.slice(0, 12) + "…" : f.name,
+      url: URL.createObjectURL(f),
+      score: null,
+      file: f,
+    }));
+    winnerId = null;
+    render();
+  }
+
+  $("#cmpPickBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    input.click();
+  });
+  drop.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    input.click();
+  });
+  input.addEventListener("change", () => addFiles(input.files));
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+    })
+  );
+  drop.addEventListener("drop", (e) => addFiles(e.dataTransfer.files || []));
+
+  grid.addEventListener("click", (e) => {
+    const pick = e.target.closest("[data-pick]");
+    if (pick) {
+      winnerId = pick.dataset.pick;
+      render();
+    }
+  });
+  grid.addEventListener("input", (e) => {
+    const inp = e.target.closest("[data-score]");
+    if (!inp) return;
+    const it = items.find((x) => x.id === inp.dataset.score);
+    if (it) {
+      it.score = inp.value === "" ? null : Number(inp.value);
+      const best = items.reduce((a, b) => ((b.score ?? -1) > (a.score ?? -1) ? b : a), items[0] || { score: -1 });
+      $("#cmpStatus").textContent = best && best.score > 0 ? `当前最高分：${best.name} (${best.score})` : `已载入 ${items.length} 张`;
+    }
+  });
+
+  $("#cmpResetBtn").addEventListener("click", () => {
+    items.forEach((it) => URL.revokeObjectURL(it.url));
+    items = [];
+    winnerId = null;
+    grid.innerHTML = "";
+    $("#cmpStatus").textContent = "—";
+  });
+}
+
 /* ========== Boot ========== */
 function init() {
   renderPath();
@@ -1121,6 +1453,10 @@ function init() {
   setupUpload();
   setupGrade();
   setupOrganize();
+  setupCalculators();
+  setupModeSwitch();
+  setupWatermark();
+  setupCompare();
 
   $("#clearJournalBtn").addEventListener("click", () => {
     if (!confirm("确定清空练习记录？")) return;

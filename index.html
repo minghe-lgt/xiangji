@@ -21,15 +21,20 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-text">光影手帐</span>
     </a>
-    <nav class="nav">
-      <a href="#plan">训练体系</a>
-      <a href="#analyze">专业分析</a>
-      <a href="#grade">调色工作台</a>
-      <a href="#organize">照片管家</a>
-      <a href="#drills">日常练习</a>
-      <a href="#library">书单课单</a>
-      <a href="#cheatsheet">构图速查</a>
-      <a href="#progress">练习记录</a>
+    <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="视图切换">
+      <button class="mode-btn active" data-mode="all" type="button">全部</button>
+      <button class="mode-btn" data-mode="learn" type="button">学习</button>
+      <button class="mode-btn" data-mode="tool" type="button">工具</button>
+    </div>
+    <nav class="nav" id="mainNav">
+      <a href="#plan" data-group="learn">训练体系</a>
+      <a href="#analyze" data-group="tool">照片分析</a>
+      <a href="#grade" data-group="tool">调色</a>
+      <a href="#tools" data-group="tool">拍摄计算</a>
+      <a href="#watermark" data-group="tool">水印 / 对比</a>
+      <a href="#organize" data-group="tool">照片管家</a>
+      <a href="#drills" data-group="learn">日常练习</a>
+      <a href="#cheatsheet" data-group="learn">构图速查</a>
     </nav>
     <button class="btn btn-ghost" id="scrollTopBtn" type="button">回到顶部</button>
   </header>
@@ -97,12 +102,12 @@
     </section>
 
     <!-- Path overview -->
-    <section class="section section-tight" id="path">
+    <section class="section section-tight" id="path" data-group="learn">
       <div class="path-strip" id="pathStrip"></div>
     </section>
 
     <!-- Training Plan -->
-    <section class="section" id="plan">
+    <section class="section" id="plan" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">CURRICULUM</p>
         <h2>六阶段 · 24 周训练体系</h2>
@@ -125,7 +130,7 @@
     </section>
 
     <!-- Photo Analysis -->
-    <section class="section section-alt" id="analyze">
+    <section class="section section-alt" id="analyze" data-group="tool">
       <div class="section-head">
         <p class="eyebrow">COMPOSITION LAB · PRO</p>
         <h2>上传照片 · 六维专业分析</h2>
@@ -236,7 +241,7 @@
     </section>
 
     <!-- Color Grading Studio -->
-    <section class="section" id="grade">
+    <section class="section" id="grade" data-group="tool">
       <div class="section-head">
         <p class="eyebrow">COLOR GRADING STUDIO</p>
         <h2>调色工作台</h2>
@@ -339,7 +344,7 @@
     </section>
 
     <!-- Photo Organizer -->
-    <section class="section section-alt" id="organize">
+    <section class="section section-alt" id="organize" data-group="tool">
       <div class="section-head">
         <p class="eyebrow">LOCAL PHOTO BUTLER</p>
         <h2>照片管家 · 本地自动归类</h2>
@@ -412,8 +417,185 @@
       </div>
     </section>
 
+    <!-- Field Calculators -->
+    <section class="section" id="tools" data-group="tool">
+      <div class="section-head">
+        <p class="eyebrow">FIELD CALCULATORS</p>
+        <h2>拍摄计算器</h2>
+        <p class="section-desc">曝光三角、景深超焦距、ND 换算、黄金时刻。离线可用。</p>
+      </div>
+
+      <div class="calc-tabs" id="calcTabs">
+        <button class="calc-tab active" data-calc="exp" type="button">曝光三角</button>
+        <button class="calc-tab" data-calc="dof" type="button">景深 / 超焦距</button>
+        <button class="calc-tab" data-calc="nd" type="button">ND 长曝</button>
+        <button class="calc-tab" data-calc="sun" type="button">黄金时刻</button>
+      </div>
+
+      <!-- 曝光 -->
+      <div class="calc-panel" id="calc-exp">
+        <div class="calc-grid">
+          <div class="calc-card">
+            <h3>参考组合</h3>
+            <label class="cfg-row"><span>光圈</span>
+              <select id="expRefN"></select>
+            </label>
+            <label class="cfg-row"><span>快门</span>
+              <select id="expRefT"></select>
+            </label>
+            <label class="cfg-row"><span>ISO</span>
+              <select id="expRefISO"></select>
+            </label>
+            <p class="calc-note" id="expRefEv">—</p>
+          </div>
+          <div class="calc-card">
+            <h3>等效换算</h3>
+            <label class="cfg-row"><span>我想锁</span>
+              <select id="expLock">
+                <option value="iso">锁 ISO，改快门</option>
+                <option value="shutter">锁快门，改 ISO</option>
+                <option value="aperture">锁光圈，改快门</option>
+              </select>
+            </label>
+            <label class="cfg-row"><span>光圈</span>
+              <select id="expN"></select>
+            </label>
+            <label class="cfg-row"><span>快门</span>
+              <select id="expT"></select>
+            </label>
+            <label class="cfg-row"><span>ISO</span>
+              <select id="expISO"></select>
+            </label>
+            <div class="calc-result" id="expResult">调整任一参数，结果自动更新</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 景深 -->
+      <div class="calc-panel hidden" id="calc-dof">
+        <div class="calc-grid">
+          <div class="calc-card">
+            <h3>镜头与机位</h3>
+            <label class="cfg-row"><span>焦距 mm</span><input type="number" id="dofFocal" value="50" min="8" max="800" /></label>
+            <label class="cfg-row"><span>光圈 f/</span>
+              <select id="dofN"></select>
+            </label>
+            <label class="cfg-row"><span>对焦距离 m</span><input type="number" id="dofDist" value="3" min="0.1" max="1000" step="0.1" /></label>
+            <label class="cfg-row"><span>画幅</span>
+              <select id="dofSensor">
+                <option>全画幅</option>
+                <option>APS-C</option>
+                <option>M4/3</option>
+                <option>1英寸</option>
+                <option>手机主摄</option>
+              </select>
+            </label>
+          </div>
+          <div class="calc-card">
+            <h3>景深结果</h3>
+            <div class="dof-out" id="dofOut">—</div>
+            <p class="calc-note">超焦距：对焦在该距离时，清晰范围约从一半到无穷远。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ND -->
+      <div class="calc-panel hidden" id="calc-nd">
+        <div class="calc-grid">
+          <div class="calc-card">
+            <h3>基准快门</h3>
+            <label class="cfg-row"><span>未装 ND 时</span>
+              <select id="ndBase"></select>
+            </label>
+            <label class="cfg-row"><span>ND 规格</span>
+              <select id="ndFilter"></select>
+            </label>
+          </div>
+          <div class="calc-card">
+            <h3>换算后快门</h3>
+            <div class="dof-out" id="ndOut">—</div>
+            <p class="calc-note">流水拉丝常用 1/4–2s；车轨/流云常用 15s–4min。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 黄金时刻 -->
+      <div class="calc-panel hidden" id="calc-sun">
+        <div class="calc-grid">
+          <div class="calc-card">
+            <h3>地点与日期</h3>
+            <label class="cfg-row"><span>纬度</span><input type="number" id="sunLat" value="30.25" step="0.01" /></label>
+            <label class="cfg-row"><span>经度</span><input type="number" id="sunLon" value="120.16" step="0.01" /></label>
+            <label class="cfg-row"><span>日期</span><input type="date" id="sunDate" /></label>
+            <div class="sun-presets">
+              <button class="chip" data-loc="30.25,120.16" type="button">杭州</button>
+              <button class="chip" data-loc="39.90,116.40" type="button">北京</button>
+              <button class="chip" data-loc="31.23,121.47" type="button">上海</button>
+              <button class="chip" data-loc="22.54,114.06" type="button">深圳</button>
+              <button class="chip" data-loc="35.68,139.69" type="button">东京</button>
+            </div>
+          </div>
+          <div class="calc-card">
+            <h3>光线时刻</h3>
+            <div class="sun-out" id="sunOut">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Watermark & Compare -->
+    <section class="section section-alt" id="watermark" data-group="tool">
+      <div class="section-head">
+        <p class="eyebrow">BATCH WATERMARK & PICK</p>
+        <h2>水印导出 · 选片对比</h2>
+        <p class="section-desc">批量加字水印导出；或把多张摊开对比，选片打分。</p>
+      </div>
+
+      <div class="wm-layout">
+        <div class="wm-block">
+          <h3>批量水印</h3>
+          <div class="wm-controls">
+            <label class="cfg-row"><span>水印文字</span><input type="text" id="wmText" value="© 光影手帐" maxlength="40" /></label>
+            <label class="cfg-row"><span>位置</span>
+              <select id="wmPos">
+                <option value="br">右下</option>
+                <option value="bl">左下</option>
+                <option value="tr">右上</option>
+                <option value="tl">左上</option>
+                <option value="c">居中</option>
+              </select>
+            </label>
+            <label class="cfg-row"><span>透明度</span><input type="range" id="wmOpacity" min="10" max="95" value="55" /></label>
+            <label class="cfg-row"><span>字号</span><input type="range" id="wmSize" min="20" max="80" value="35" /></label>
+          </div>
+          <div class="wm-drop" id="wmDrop">
+            <input type="file" id="wmFiles" accept="image/*" multiple hidden />
+            <p>拖入多张图片，或 <button class="btn btn-secondary" id="wmPickBtn" type="button">选择图片</button></p>
+            <p class="calc-note">导出为 JPEG 0.92，逐张下载</p>
+          </div>
+          <div class="wm-actions">
+            <button class="btn btn-primary" id="wmRunBtn" type="button">加水印并导出</button>
+            <span class="mono" id="wmStatus">未选择文件</span>
+          </div>
+        </div>
+
+        <div class="wm-block">
+          <h3>选片对比</h3>
+          <div class="cmp-drop" id="cmpDrop">
+            <input type="file" id="cmpFiles" accept="image/*" multiple hidden />
+            <p>拖入 2–6 张照片对比 <button class="btn btn-secondary" id="cmpPickBtn" type="button">选择图片</button></p>
+          </div>
+          <div class="cmp-grid" id="cmpGrid"></div>
+          <div class="wm-actions">
+            <button class="btn btn-ghost" id="cmpResetBtn" type="button">清空对比</button>
+            <span class="mono" id="cmpStatus">—</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Drills -->
-    <section class="section" id="drills">
+    <section class="section" id="drills" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">DAILY DRILLS</p>
         <h2>日常快练</h2>
@@ -423,7 +605,7 @@
     </section>
 
     <!-- Library -->
-    <section class="section section-alt" id="library">
+    <section class="section section-alt" id="library" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">READING & COURSES</p>
         <h2>书单与课单</h2>
@@ -433,7 +615,7 @@
     </section>
 
     <!-- Cheat sheet -->
-    <section class="section" id="cheatsheet">
+    <section class="section" id="cheatsheet" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">FIELD NOTES</p>
         <h2>构图速查 · 9 条</h2>
@@ -443,7 +625,7 @@
     </section>
 
     <!-- Progress -->
-    <section class="section section-alt" id="progress">
+    <section class="section section-alt" id="progress" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">JOURNAL</p>
         <h2>我的练习记录</h2>
@@ -479,6 +661,7 @@
   <script src="raw.js"></script>
   <script src="colorgrade.js"></script>
   <script src="organize.js"></script>
+  <script src="tools.js"></script>
   <script src="analyze.js"></script>
   <script src="app.js"></script>
 </body>
