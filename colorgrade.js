@@ -482,15 +482,57 @@ async function askLLMGrade(canvas, userIntent, meta) {
 /** 导出调色后的 JPEG */
 function exportCanvasJPEG(canvas, quality = 0.95) {
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+    canvas.toBlob(
+      (blob) => {
+        // 某些环境 toBlob 可能失败，用 dataURL 兜底
+        if (blob) return resolve(blob);
+        try {
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(dataURLtoBlob(dataUrl));
+        } catch (e) {
+          resolve(null);
+        }
+      },
+      "image/jpeg",
+      quality
+    );
   });
 }
 
-/** 导出无损 PNG */
+/**
+ * 导出 PNG —— 对「当前画布像素」无损（8-bit / sRGB）。
+ * 注意：若源图本身来自 ARW 内嵌 JPEG，那一步已有损，PNG 只能保证后续不再劣化。
+ */
 function exportCanvasPNG(canvas) {
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), "image/png");
+    canvas.toBlob(
+      (blob) => {
+        if (blob && blob.type === "image/png") return resolve(blob);
+        try {
+          const dataUrl = canvas.toDataURL("image/png");
+          resolve(dataURLtoBlob(dataUrl));
+        } catch (e) {
+          resolve(null);
+        }
+      },
+      "image/png"
+    );
   });
+}
+
+function dataURLtoBlob(dataUrl) {
+  const parts = dataUrl.split(",");
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bin = atob(parts[1]);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+/** 画布是否仍等于「未调色」默认状态 */
+function isNeutralGrade(params) {
+  const d = DEFAULT_GRADE;
+  return Object.keys(d).every((k) => Math.abs((params[k] ?? 0) - d[k]) < 0.001);
 }
 
 function downloadBlob(blob, filename) {

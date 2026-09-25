@@ -278,6 +278,8 @@ function scanAllJpegs(bytes) {
 }
 
 async function finalizeCandidate(best, fileSize, rawW, rawH, rawBits, total) {
+  // 保留原始 JPEG 字节，导出「原图」时可零重编码
+  const originalBytes = best.bytes;
   const blob = new Blob([best.bytes], { type: "image/jpeg" });
   const dim = await imageBlobSize(blob);
   const width = dim.width || best.width;
@@ -293,6 +295,7 @@ async function finalizeCandidate(best, fileSize, rawW, rawH, rawBits, total) {
 
   return {
     blob,
+    originalBytes,
     width,
     height,
     rawWidth: rawW || 0,
@@ -327,6 +330,9 @@ async function loadPhotoFile(file) {
         rawWidth: preview.rawWidth,
         rawHeight: preview.rawHeight,
         isFullRaw: preview.isFullRaw,
+        originalBlob: preview.blob,
+        originalBytes: preview.originalBytes || null,
+        originalName: file.name.replace(/\.[^.]+$/i, "") + "-preview.jpg",
         cleanup: () => URL.revokeObjectURL(url),
       };
     } catch (e) {
@@ -343,6 +349,9 @@ async function loadPhotoFile(file) {
       rawWidth: img.naturalWidth,
       rawHeight: img.naturalHeight,
       isFullRaw: true,
+      originalBlob: file,
+      originalBytes: null,
+      originalName: file.name,
       cleanup: () => URL.revokeObjectURL(url),
     };
   } catch (e) {

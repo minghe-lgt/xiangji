@@ -1076,6 +1076,15 @@ select { font: inherit; color: inherit; }
   flex-wrap: wrap;
 }
 
+.grade-export-note {
+  margin: 0;
+  padding: 10px 16px 14px;
+  font-size: 0.72rem;
+  line-height: 1.65;
+  color: var(--ink-dim);
+  border-top: 1px dashed var(--line);
+}
+
 .grade-panel {
   display: flex;
   flex-direction: column;

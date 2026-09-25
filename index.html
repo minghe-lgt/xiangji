@@ -270,11 +270,16 @@
                 <span class="mono" id="gradeMeta">—</span>
                 <div class="grade-meta-actions">
                   <button class="btn btn-ghost" id="toggleCompareBtn" type="button">对比原图</button>
-                  <button class="btn btn-secondary" id="exportPngBtn" type="button">导出 PNG 无损</button>
+                  <button class="btn btn-secondary" id="exportOrigBtn" type="button">导出原图（零编码）</button>
+                  <button class="btn btn-secondary" id="exportPngBtn" type="button">导出 PNG</button>
                   <button class="btn btn-ghost" id="exportBtn" type="button">导出 JPEG</button>
                   <button class="btn btn-ghost" id="gradeResetFileBtn" type="button">换一张</button>
                 </div>
               </div>
+              <p class="grade-export-note">
+                「导出原图」直接下载你载入的文件字节，不重编码。<br />
+                「导出 PNG」对当前调色结果无损；但若源是 ARW 内嵌 JPEG，相机内那一步已有损，网页无法恢复 RAW 像素。
+              </p>
             </div>
           </div>
         </div>

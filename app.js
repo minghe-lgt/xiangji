@@ -505,6 +505,9 @@ let gradeState = {
   params: { ...DEFAULT_GRADE },
   showingOriginal: false,
   activePreset: null,
+  originalBlob: null,
+  originalBytes: null,
+  originalName: "",
 };
 
 function setupGrade() {
@@ -622,11 +625,37 @@ function setupGrade() {
     if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.jpg`);
   });
 
+  // PNG：对「当前调色结果」的像素无损；若未调色则直接给原始字节（零重编码）
   $("#exportPngBtn").addEventListener("click", async () => {
     if (!gradeState.sourceCanvas) return;
+
+    if (isNeutralGrade(gradeState.params) && gradeState.originalBlob) {
+      // 未调色：直接导出原始文件字节，完全不重编码
+      const name = gradeState.originalName || `lightjournal-original-${Date.now()}`;
+      downloadBlob(gradeState.originalBlob, name);
+      alert("已按「原图」零重编码导出。\n说明：若源文件是 ARW 内嵌 JPEG，那一步在相机内已完成有损压缩；网页无法凭空恢复 RAW 原始像素。");
+      return;
+    }
+
     const full = renderFullGrade() || gradeCanvas;
     const blob = await exportCanvasPNG(full);
-    if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.png`);
+    if (!blob) {
+      alert("PNG 导出失败");
+      return;
+    }
+    if (blob.type !== "image/png") {
+      alert("导出格式异常：" + blob.type + "，已按 PNG 重试");
+    }
+    downloadBlob(blob, `lightjournal-grade-${Date.now()}.png`);
+  });
+
+  // 导出原始字节（不调色、不重编码）
+  $("#exportOrigBtn").addEventListener("click", () => {
+    if (!gradeState.originalBlob) {
+      alert("没有保留原始文件");
+      return;
+    }
+    downloadBlob(gradeState.originalBlob, gradeState.originalName || `lightjournal-original-${Date.now()}`);
   });
 
   // LLM config
@@ -857,6 +886,9 @@ async function handleGradeFile(file) {
     gradeState.params = { ...DEFAULT_GRADE };
     gradeState.activePreset = null;
     gradeState.showingOriginal = false;
+    gradeState.originalBlob = loaded.originalBlob || null;
+    gradeState.originalBytes = loaded.originalBytes || null;
+    gradeState.originalName = loaded.originalName || file.name;
 
     $("#gradeEmpty").classList.add("hidden");
     $("#gradePreview").classList.remove("hidden");
