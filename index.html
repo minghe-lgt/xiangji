@@ -25,6 +25,7 @@
       <a href="#plan">训练体系</a>
       <a href="#analyze">专业分析</a>
       <a href="#grade">调色工作台</a>
+      <a href="#organize">照片管家</a>
       <a href="#drills">日常练习</a>
       <a href="#library">书单课单</a>
       <a href="#cheatsheet">构图速查</a>
@@ -337,6 +338,80 @@
       </div>
     </section>
 
+    <!-- Photo Organizer -->
+    <section class="section section-alt" id="organize">
+      <div class="section-head">
+        <p class="eyebrow">LOCAL PHOTO BUTLER</p>
+        <h2>照片管家 · 本地自动归类</h2>
+        <p class="section-desc">
+          选一个本地文件夹，自动筛出今天拍的照片，按类型分文件夹、按规则重命名，再写回你指定的位置。不经过云端。
+          需要 Chrome / Edge（File System Access）。
+        </p>
+      </div>
+
+      <div class="org-layout">
+        <div class="org-main">
+          <div class="org-toolbar">
+            <button class="btn btn-primary" id="orgScanBtn" type="button">1 · 选择照片文件夹</button>
+            <button class="btn btn-secondary" id="orgDestBtn" type="button">2 · 选择输出位置</button>
+            <button class="btn btn-primary" id="orgRunBtn" type="button">3 · 一键整理</button>
+            <button class="btn btn-ghost" id="orgResetBtn" type="button">重置</button>
+          </div>
+
+          <div class="org-rules">
+            <h3>命名与归类规则</h3>
+            <div class="rule-grid">
+              <div class="rule-item">
+                <span class="rule-label">目录</span>
+                <code>YYYY-MM / 类型 /</code>
+                <span class="rule-hint">例：2026-03 / 人像 /</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">文件名</span>
+                <code>YYYYMMDD_HHmm_类型_地点_序号.ext</code>
+                <span class="rule-hint">例：20260326_1432_人像_西湖_001.jpg</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">类型</span>
+                <code>人像 / 风光 / 夜景 / 街拍 / 静物 / 文档 / 未分类</code>
+                <span class="rule-hint">依据画面特征 + 文件名启发式</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">时间</span>
+                <code>优先 EXIF DateTimeOriginal，否则文件修改时间</code>
+                <span class="rule-hint">默认只整理「今天」的照片</span>
+              </div>
+            </div>
+
+            <label class="org-field">
+              <span>地点标签（写入文件名，可空）</span>
+              <input type="text" id="orgLocation" placeholder="例如：西湖 / 公司 / 东京" maxlength="12" />
+            </label>
+            <label class="org-field check-field">
+              <input type="checkbox" id="orgTodayOnly" checked />
+              <span>只整理今天拍的照片（取消则处理全部图片）</span>
+            </label>
+          </div>
+
+          <div class="org-status" id="orgStatus">
+            尚未扫描。点「选择照片文件夹」开始。
+          </div>
+        </div>
+
+        <aside class="org-side">
+          <div class="org-stat-row">
+            <div class="org-stat"><strong id="orgScanCount">0</strong><span>扫描到</span></div>
+            <div class="org-stat"><strong id="orgMatchCount">0</strong><span>今日匹配</span></div>
+            <div class="org-stat"><strong id="orgDoneCount">0</strong><span>已整理</span></div>
+          </div>
+          <div class="org-preview" id="orgPreview">
+            <p class="org-empty">预览列表会出现在这里</p>
+          </div>
+          <div class="org-log" id="orgLog"></div>
+        </aside>
+      </div>
+    </section>
+
     <!-- Drills -->
     <section class="section" id="drills">
       <div class="section-head">
@@ -403,6 +478,7 @@
   <script src="data.js"></script>
   <script src="raw.js"></script>
   <script src="colorgrade.js"></script>
+  <script src="organize.js"></script>
   <script src="analyze.js"></script>
   <script src="app.js"></script>
 </body>

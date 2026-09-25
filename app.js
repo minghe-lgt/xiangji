@@ -919,6 +919,195 @@ async function handleGradeFile(file) {
   }
 }
 
+/* ========== Photo Organizer ========== */
+const orgState = {
+  srcDir: null,
+  destDir: null,
+  items: [], // { file, handle, relPath, category, reason, planned, thumb }
+  done: 0,
+};
+
+function orgLog(msg, cls) {
+  const el = $("#orgLog");
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.prepend(line);
+}
+
+function renderOrgPreview() {
+  const box = $("#orgPreview");
+  if (!orgState.items.length) {
+    box.innerHTML = `<p class="org-empty">预览列表会出现在这里</p>`;
+    return;
+  }
+  box.innerHTML = orgState.items
+    .slice(0, 80)
+    .map(
+      (it) => `
+    <div class="org-item">
+      <img class="org-thumb" src="${it.thumb || ""}" alt="" />
+      <div class="path">${it.planned ? it.planned.path : it.relPath}</div>
+      <span class="tag">${it.category || "…"}</span>
+    </div>
+  `
+    )
+    .join("");
+}
+
+async function setupOrganize() {
+  if (!supportsFileSystemAccess()) {
+    $("#orgStatus").innerHTML =
+      "检测到当前浏览器不支持本地文件夹写入。请用 <strong>Chrome / Edge</strong> 打开本站；功能仅在本地读写你授权的文件夹。";
+    $("#orgScanBtn").disabled = true;
+    $("#orgDestBtn").disabled = true;
+    $("#orgRunBtn").disabled = true;
+    return;
+  }
+
+  $("#orgScanBtn").addEventListener("click", async () => {
+    try {
+      const dir = await pickDirectory("read");
+      orgState.srcDir = dir;
+      orgState.items = [];
+      orgState.done = 0;
+      $("#orgDoneCount").textContent = "0";
+      $("#orgStatus").textContent = `已选择来源：${dir.name} 。正在扫描…`;
+      orgLog(`扫描 ${dir.name} …`);
+
+      const entries = await listImagesInDirectory(dir, 400);
+      $("#orgScanCount").textContent = String(entries.length);
+      orgLog(`发现 ${entries.length} 个图片文件`, "ok");
+
+      const todayOnly = $("#orgTodayOnly").checked;
+      const items = [];
+      for (const entry of entries) {
+        try {
+          const buf = await readFileAsArrayBuffer(entry.file, 12 * 1024 * 1024);
+          const exif = parseExifFromArrayBuffer(buf);
+          const date = exif.dateTime || new Date(entry.file.lastModified);
+          if (todayOnly && !isToday(date) && !isSameDay(date, new Date())) continue;
+
+          // 缩略图 + 分类（重图用 file 即可）
+          let img = null;
+          try {
+            img = await fileToImage(entry.file);
+          } catch {
+            /* ignore decode fail */
+          }
+          const category = img ? classifyImage(img, entry.file.name).category : "未分类";
+          let thumb = "";
+          if (img) {
+            const c = document.createElement("canvas");
+            const s = 64 / Math.max(img.naturalWidth, img.naturalHeight);
+            c.width = Math.max(1, Math.round(img.naturalWidth * s));
+            c.height = Math.max(1, Math.round(img.naturalHeight * s));
+            c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+            thumb = c.toDataURL("image/jpeg", 0.6);
+            if (img._objectUrl) URL.revokeObjectURL(img._objectUrl);
+          }
+
+          items.push({
+            file: entry.file,
+            handle: entry.handle,
+            relPath: entry.relPath,
+            category,
+            date,
+            exif,
+            thumb,
+          });
+        } catch (e) {
+          orgLog(`跳过 ${entry.relPath}: ${e.message || e}`, "err");
+        }
+      }
+
+      // 按时间排序 + 分配序号 + 生成新名字
+      items.sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
+      const loc = $("#orgLocation").value.trim();
+      const seqMap = {};
+      for (const it of items) {
+        const key = `${it.date?.getFullYear()}-${it.date?.getMonth()}-${it.category}`;
+        seqMap[key] = (seqMap[key] || 0) + 1;
+        it.planned = buildOrganizedName(
+          { name: it.file.name, lastModified: it.file.lastModified },
+          { dateTime: it.date, gps: it.exif?.gps },
+          it.category,
+          loc,
+          seqMap[key]
+        );
+      }
+
+      orgState.items = items;
+      $("#orgMatchCount").textContent = String(items.length);
+      renderOrgPreview();
+      $("#orgStatus").innerHTML = `扫描完成：共 ${entries.length} 张图，匹配 <strong>${items.length}</strong> 张。确认无误后点「一键整理」写入输出位置。`;
+      orgLog(`准备整理 ${items.length} 张`, "ok");
+    } catch (e) {
+      $("#orgStatus").textContent = `扫描失败：${e.message || e}`;
+      orgLog(String(e.message || e), "err");
+    }
+  });
+
+  $("#orgDestBtn").addEventListener("click", async () => {
+    try {
+      const dir = await pickDirectory("readwrite");
+      orgState.destDir = dir;
+      $("#orgStatus").innerHTML = `输出位置：<strong>${dir.name}</strong>。文件会按 YYYY-MM/类型/ 写入。`;
+      orgLog(`输出目录：${dir.name}`, "ok");
+    } catch (e) {
+      orgLog(String(e.message || e), "err");
+    }
+  });
+
+  $("#orgRunBtn").addEventListener("click", async () => {
+    if (!orgState.items.length) {
+      alert("请先扫描照片文件夹");
+      return;
+    }
+    if (!orgState.destDir) {
+      alert("请选择输出位置");
+      return;
+    }
+    const btn = $("#orgRunBtn");
+    btn.disabled = true;
+    btn.textContent = "整理中…";
+    let ok = 0;
+    let fail = 0;
+    try {
+      for (let i = 0; i < orgState.items.length; i++) {
+        const it = orgState.items[i];
+        try {
+          const blob = it.file; // File 本身就是 Blob
+          await writeFileToDirectory(orgState.destDir, it.planned.folder, it.planned.fileName, blob);
+          ok++;
+          $("#orgDoneCount").textContent = String(ok);
+          orgLog(`✓ ${it.planned.path}`, "ok");
+        } catch (e) {
+          fail++;
+          orgLog(`✗ ${it.relPath}: ${e.message || e}`, "err");
+        }
+      }
+      $("#orgStatus").innerHTML = `整理完成：<strong>${ok}</strong> 成功` + (fail ? `，${fail} 失败` : "") + `。输出在「${orgState.destDir.name}」。`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "3 · 一键整理";
+    }
+  });
+
+  $("#orgResetBtn").addEventListener("click", () => {
+    orgState.srcDir = null;
+    orgState.destDir = null;
+    orgState.items = [];
+    orgState.done = 0;
+    $("#orgScanCount").textContent = "0";
+    $("#orgMatchCount").textContent = "0";
+    $("#orgDoneCount").textContent = "0";
+    $("#orgPreview").innerHTML = `<p class="org-empty">预览列表会出现在这里</p>`;
+    $("#orgLog").innerHTML = "";
+    $("#orgStatus").textContent = "已重置。点「选择照片文件夹」开始。";
+  });
+}
+
 /* ========== Boot ========== */
 function init() {
   renderPath();
@@ -931,6 +1120,7 @@ function init() {
   renderJournal();
   setupUpload();
   setupGrade();
+  setupOrganize();
 
   $("#clearJournalBtn").addEventListener("click", () => {
     if (!confirm("确定清空练习记录？")) return;
