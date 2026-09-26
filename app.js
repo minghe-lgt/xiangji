@@ -393,12 +393,78 @@ function setupUpload() {
   const overlayCanvas = $("#overlayCanvas");
   const overlayMode = $("#overlayMode");
 
+  let analysisMode = "local"; // local | ai | both
+  let lastLocalResult = null;
+  let lastImage = null;
+
+  $("#analysisMode")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-amode]");
+    if (!btn) return;
+    $$("#analysisMode .mode-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    analysisMode = btn.dataset.amode;
+    $("#aiReview")?.classList.toggle("hidden", analysisMode === "local");
+    if ((analysisMode === "ai" || analysisMode === "both") && lastLocalResult && photoCanvas.width) {
+      runAIReview();
+    }
+  });
+
   function resetView() {
     uploadEmpty.classList.remove("hidden");
     uploadPreview.classList.add("hidden");
     $("#resultsBody").classList.add("hidden");
     $("#resultsEmpty").classList.remove("hidden");
+    $("#aiReview")?.classList.add("hidden");
     fileInput.value = "";
+    lastLocalResult = null;
+    lastImage = null;
+  }
+
+  async function runAIReview() {
+    if (!lastImage) return;
+    if (!llmConfigReady()) {
+      alert("尚未配置大模型。请到「调色工作台 → 厂商设置」填写 API Key 后再用 AI 点评。");
+      return;
+    }
+    const box = $("#aiReview");
+    box?.classList.remove("hidden");
+    const metaEl = $("#aiReviewMeta");
+    if (metaEl) metaEl.textContent = "生成中…";
+    try {
+      // 用原图画布
+      const c = document.createElement("canvas");
+      const max = 1280;
+      const s = Math.min(1, max / Math.max(lastImage.naturalWidth, lastImage.naturalHeight));
+      c.width = Math.round(lastImage.naturalWidth * s);
+      c.height = Math.round(lastImage.naturalHeight * s);
+      c.getContext("2d").drawImage(lastImage, 0, 0, c.width, c.height);
+      const ai = await askLLMAnalyze(c, lastLocalResult);
+      if (metaEl) metaEl.textContent = `${ai.vendor} · ${ai.model}`;
+      $("#aiSummary").textContent = ai.summary || "—";
+      $("#aiScores").innerHTML = Object.entries(ai.scores)
+        .map(([k, v]) => {
+          const name = {
+            composition: "构图",
+            exposure: "曝光",
+            color: "色彩",
+            light: "用光",
+            story: "叙事",
+            technical: "技术",
+          }[k] || k;
+          return `<div class="ai-score"><span>${name}</span><strong>${v}</strong></div>`;
+        })
+        .join("");
+      $("#aiStrengths").innerHTML = (ai.strengths || []).map((x) => `<li>${x}</li>`).join("") || "<li>—</li>";
+      $("#aiImprovements").innerHTML = (ai.improvements || []).map((x) => `<li>${x}</li>`).join("") || "<li>—</li>";
+      $("#aiComposition").textContent = ai.composition || "—";
+      $("#aiLight").textContent = ai.light || "—";
+      $("#aiColor").textContent = ai.color || "—";
+      $("#aiNarrative").textContent = ai.narrative || "—";
+      $("#aiShoot").textContent = ai.shootingAdvice || "—";
+    } catch (err) {
+      if (metaEl) metaEl.textContent = "失败";
+      $("#aiSummary").textContent = `AI 点评失败：${err.message || err}`;
+    }
   }
 
   function handleFile(file) {
@@ -420,8 +486,16 @@ function setupUpload() {
       uploadPreview.classList.remove("hidden");
       $("#fileMeta").textContent = `${file.name.slice(0, 32)} · ${img.naturalWidth}×${img.naturalHeight}`;
 
+      lastImage = img;
       const result = analyzeImage(img);
+      lastLocalResult = result;
       renderResults(result);
+
+      if (analysisMode !== "ai") {
+        $("#resultsBody").classList.remove("hidden");
+      } else {
+        $("#resultsBody").classList.remove("hidden");
+      }
 
       saveJournalEntry({
         name: file.name.length > 24 ? file.name.slice(0, 24) + "…" : file.name,
@@ -434,6 +508,12 @@ function setupUpload() {
 
       URL.revokeObjectURL(url);
       fileInput.value = "";
+
+      if (analysisMode === "ai" || analysisMode === "both") {
+        runAIReview();
+      } else {
+        $("#aiReview")?.classList.add("hidden");
+      }
     };
     img.onerror = () => {
       alert("图片读取失败，请换一张试试");
@@ -498,6 +578,16 @@ const GRADE_SLIDERS = [
   { key: "clarity", name: "清晰度", min: -100, max: 100, scale: 1 },
   { key: "fade", name: "褪色", min: 0, max: 100, scale: 1 },
   { key: "vignette", name: "暗角", min: 0, max: 100, scale: 1 },
+  { key: "curveShadows", name: "曲线·暗部", min: -100, max: 100, scale: 1 },
+  { key: "curveMids", name: "曲线·中间", min: -100, max: 100, scale: 1 },
+  { key: "curveHighlights", name: "曲线·高光", min: -100, max: 100, scale: 1 },
+  { key: "hueOrange", name: "HSL·橙", min: -100, max: 100, scale: 1 },
+  { key: "satOrange", name: "HSL·橙饱", min: -100, max: 100, scale: 1 },
+  { key: "hueBlue", name: "HSL·蓝", min: -100, max: 100, scale: 1 },
+  { key: "satBlue", name: "HSL·蓝饱", min: -100, max: 100, scale: 1 },
+  { key: "splitStrength", name: "分离色调", min: 0, max: 100, scale: 1 },
+  { key: "splitHue", name: "高光色相", min: 0, max: 360, scale: 1 },
+  { key: "splitHueShadow", name: "阴影色相", min: 0, max: 360, scale: 1 },
 ];
 
 let gradeState = {
@@ -947,7 +1037,10 @@ function renderOrgPreview() {
       (it) => `
     <div class="org-item">
       <img class="org-thumb" src="${it.thumb || ""}" alt="" />
-      <div class="path">${it.planned ? it.planned.path : it.relPath}</div>
+      <div class="path">
+        ${it.planned ? it.planned.path : it.relPath}
+        ${it.exifSummary ? `<div class="org-exif mono">${it.exifSummary}</div>` : ""}
+      </div>
       <span class="tag">${it.category || "…"}</span>
     </div>
   `
@@ -1014,6 +1107,7 @@ async function setupOrganize() {
             category,
             date,
             exif,
+            exifSummary: formatExifSummary(exif),
             thumb,
           });
         } catch (e) {
@@ -1770,6 +1864,18 @@ function init() {
     if (!confirm("确定清空练习记录？")) return;
     saveJSON(STORE_KEYS.journal, []);
     renderJournal();
+  });
+
+  $("#genReportBtn")?.addEventListener("click", () => {
+    const data = computeLearningReport();
+    renderLearningReport($("#learningReportMount"), data);
+    $("#learningReportMount")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  $("#exportReportBtn")?.addEventListener("click", () => {
+    const data = computeLearningReport();
+    renderLearningReport($("#learningReportMount"), data);
+    downloadLearningReportHTML(data);
   });
 
   $("#scrollTopBtn").addEventListener("click", () => {

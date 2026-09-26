@@ -18,6 +18,17 @@ const DEFAULT_GRADE = {
   clarity: 0,       // -100 .. 100
   fade: 0,          // 0 .. 100 褪色胶片感
   vignette: 0,      // 0 .. 100 暗角
+  // 色调曲线（阴影 / 中间调 / 高光）
+  curveShadows: 0,  // -100..100
+  curveMids: 0,
+  curveHighlights: 0,
+  // HSL 主色微调
+  hueRed: 0, hueOrange: 0, hueYellow: 0, hueGreen: 0, hueAqua: 0, hueBlue: 0,
+  satRed: 0, satOrange: 0, satYellow: 0, satGreen: 0, satAqua: 0, satBlue: 0,
+  // 分离色调
+  splitHue: 0,      // 高光色相 0-360（用 0 表示关闭）
+  splitHueShadow: 0,
+  splitStrength: 0, // 0-100
 };
 
 /** 风格预设 */
@@ -130,6 +141,86 @@ function applyGrade(srcCanvas, params) {
     return clamp(y * 255, 0, 255);
   };
 
+  // 色调曲线：阴影 / 中间调 / 高光
+  const applyCurve = (L) => {
+    const x = clamp(L, 0, 255) / 255;
+    let y = x;
+    if (p.curveShadows !== 0) y += (p.curveShadows / 100) * 0.22 * (1 - x) * (1 - x);
+    if (p.curveMids !== 0) y += (p.curveMids / 100) * 0.2 * (1 - Math.abs(x - 0.5) * 2);
+    if (p.curveHighlights !== 0) y += (p.curveHighlights / 100) * 0.22 * x * x;
+    return clamp(y * 255, 0, 255);
+  };
+
+  // HSL 按红/橙/黄/绿/青/蓝微调
+  const applyFamily = (r, g, b) => {
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    const dlt = mx - mn;
+    if (dlt < 10) return [r, g, b];
+    const fam = {};
+    if (mx === r) {
+      fam.red = g >= b ? (g - b) / dlt : 1;
+      if (g > b) fam.orange = (g - b) / dlt;
+    } else if (mx === g) {
+      fam.green = (b - r) / dlt + 1;
+      if (r > b) fam.yellow = (r - b) / dlt;
+    } else {
+      fam.blue = (r - g) / dlt + 1;
+      if (g > r) fam.aqua = (g - r) / dlt;
+    }
+    let nr = r, ng = g, nb = b;
+    const knobs = [
+      ["red", p.hueRed, p.satRed],
+      ["orange", p.hueOrange, p.satOrange],
+      ["yellow", p.hueYellow, p.satYellow],
+      ["green", p.hueGreen, p.satGreen],
+      ["aqua", p.hueAqua, p.satAqua],
+      ["blue", p.hueBlue, p.satBlue],
+    ];
+    for (const [key, dh, ds] of knobs) {
+      const w = Math.min(1, fam[key] || 0);
+      if (w <= 0.02) continue;
+      const isWarm = key === "red" || key === "orange" || key === "yellow";
+      const hueAmt = dh * w * 0.01;
+      if (isWarm) {
+        nr += hueAmt * 38;
+        nb -= hueAmt * 38;
+      } else {
+        nr -= hueAmt * 38;
+        nb += hueAmt * 38;
+      }
+      const Lv = 0.2126 * nr + 0.7152 * ng + 0.0722 * nb;
+      const sm = 1 + (ds / 100) * w * 0.55;
+      nr = Lv + (nr - Lv) * sm;
+      ng = Lv + (ng - Lv) * sm;
+      nb = Lv + (nb - Lv) * sm;
+    }
+    return [clamp(nr, 0, 255), clamp(ng, 0, 255), clamp(nb, 0, 255)];
+  };
+
+  // 分离色调：高光/阴影染色
+  const applySplitTint = (r, g, b) => {
+    if (!p.splitStrength) return [r, g, b];
+    const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const w = (p.splitStrength / 100) * 0.24;
+    const hiW = Math.max(0, L / 255 - 0.45) * 1.8 * w;
+    const shW = Math.max(0, 0.55 - L / 255) * 1.8 * w;
+    let nr = r, ng = g, nb = b;
+    if (p.splitHue) {
+      const a = (p.splitHue - 40) / 180;
+      nr += hiW * (a > 0 ? 55 : 8) * (a > 0 ? 1 : -0.2);
+      ng += hiW * (a > 0 ? 18 : 6);
+      nb += hiW * (a > 0 ? -35 : 60);
+    }
+    if (p.splitHueShadow) {
+      const a = (p.splitHueShadow - 200) / 180;
+      nr += shW * (a > 0 ? -18 : 28);
+      ng += shW * 6;
+      nb += shW * (a > 0 ? 58 : -12);
+    }
+    return [clamp(nr, 0, 255), clamp(ng, 0, 255), clamp(nb, 0, 255)];
+  };
+
   for (let i = 0; i < d.length; i += 4) {
     let r = d[i] * evMul * rGain;
     let g = d[i + 1] * evMul * gGain;
@@ -161,12 +252,13 @@ function applyGrade(srcCanvas, params) {
       r *= f; g *= f; b *= f;
     }
 
-    // contrast & clarity on luminance
+    // contrast & clarity & tone curve on luminance
     L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const Lc = contrastCurve(L);
     const Lcl = clarityCurve(Lc);
+    const Lcur = applyCurve(Lcl);
     if (L > 1) {
-      const scale = Lcl / L;
+      const scale = Lcur / L;
       r *= scale; g *= scale; b *= scale;
     }
 
@@ -183,6 +275,12 @@ function applyGrade(srcCanvas, params) {
     r = L + (r - L) * satMul;
     g = L + (g - L) * satMul;
     b = L + (b - L) * satMul;
+
+    // HSL family
+    [r, g, b] = applyFamily(r, g, b);
+
+    // split tone
+    [r, g, b] = applySplitTint(r, g, b);
 
     // fade
     r = fadeCurve(r);
@@ -345,6 +443,155 @@ function canvasToThumbBase64(canvas, maxSize = 512) {
   c.height = h;
   c.getContext("2d").drawImage(canvas, 0, 0, w, h);
   return c.toDataURL("image/jpeg", 0.82).split(",")[1];
+}
+
+function llmConfigReady() {
+  const cfg = loadLLMConfig();
+  return !!(cfg.vendorId && cfg.apiKey && (cfg.baseUrl || (LLM_VENDORS.find((v) => v.id === cfg.vendorId) || {}).baseUrl));
+}
+
+/** 通用 LLM 视觉调用：system + userText + image */
+async function callLLMVision({ system, userText, canvas, maxTokens = 1200 }) {
+  const cfg = loadLLMConfig();
+  if (!cfg.vendorId || !cfg.apiKey) {
+    throw new Error("尚未配置大模型。请在调色工作台「厂商设置」里填写厂商与 API Key。");
+  }
+  const vendor = LLM_VENDORS.find((v) => v.id === cfg.vendorId) || LLM_VENDORS[0];
+  const baseUrl = (cfg.baseUrl || vendor.baseUrl || "").replace(/\/$/, "");
+  const model = cfg.model || vendor.models[0];
+  if (!baseUrl) throw new Error("请填写 API Base URL");
+  if (!model) throw new Error("请填写模型名称");
+
+  const thumb = canvasToThumbBase64(canvas, 640);
+
+  let res;
+  if (vendor.id === "anthropic") {
+    res = await fetch(`${baseUrl}/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": cfg.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: thumb } },
+              { type: "text", text: userText },
+            ],
+          },
+        ],
+      }),
+    });
+  } else {
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${cfg.apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        temperature: 0.5,
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: userText },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${thumb}` } },
+            ],
+          },
+        ],
+      }),
+    });
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`API ${res.status}: ${t.slice(0, 200) || "请求失败"}`);
+  }
+
+  const data = await res.json();
+  let content;
+  if (vendor.id === "anthropic") {
+    content = data.content && data.content[0] && data.content[0].text;
+  } else {
+    content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  }
+  if (!content) throw new Error("模型没有返回内容");
+  return { content, vendor: vendor.name, model };
+}
+
+/**
+ * 大模型专业摄影点评（结构化）
+ * @returns {Promise<{scores:object, summary:string, strengths:string[], improvements:string[], composition:string, light:string, color:string, narrative:string, vendor:string, model:string}>}
+ */
+async function askLLMAnalyze(canvas, localMeta) {
+  const system = `你是资深摄影评审，风格接近摄影工作坊导师：专业、具体、可执行。
+只输出 JSON，不要 markdown：
+{
+  "scores": {"composition":0-100,"exposure":0-100,"color":0-100,"light":0-100,"story":0-100,"technical":0-100},
+  "summary": "50字内总评",
+  "strengths": ["亮点1","亮点2"],
+  "improvements": ["改进1","改进2","改进3"],
+  "composition": "构图细评 60-100字",
+  "light": "用光细评 60-100字",
+  "color": "色彩细评 60-100字",
+  "narrative": "叙事/情绪 40-80字",
+  "shootingAdvice": "下次拍摄可执行建议 1-2条"
+}`;
+
+  const userText = `请专业点评这张照片。本地启发式参考数据（仅供校准，以你看图为准）：
+综合 ${localMeta?.overall ?? "-"}，构图 ${localMeta?.dims?.find?.((d) => d.key === "composition")?.score ?? "-"}，
+曝光 ${localMeta?.dims?.find?.((d) => d.key === "exposure")?.score ?? "-"}，
+均值亮度 ${localMeta?.meta?.meanL ?? "-"}，对比 ${localMeta?.meta?.contrast ?? "-"}，
+动态范围 ${localMeta?.meta?.dynamicRange ?? "-"}，光向 ${localMeta?.light?.direction ?? "-"}。
+请输出 JSON。`;
+
+  const { content, vendor, model } = await callLLMVision({ system, userText, canvas, maxTokens: 1400 });
+  const m = content.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("返回中没有找到 JSON");
+  let parsed;
+  try {
+    parsed = JSON.parse(m[0]);
+  } catch {
+    throw new Error("返回的 JSON 无法解析");
+  }
+
+  const num = (v, d = 70) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? clamp(n, 0, 100) : d;
+  };
+  const arr = (v) => (Array.isArray(v) ? v.slice(0, 6).map(String) : []);
+
+  return {
+    scores: {
+      composition: num(parsed.scores?.composition),
+      exposure: num(parsed.scores?.exposure),
+      color: num(parsed.scores?.color),
+      light: num(parsed.scores?.light),
+      story: num(parsed.scores?.story),
+      technical: num(parsed.scores?.technical),
+    },
+    summary: String(parsed.summary || "").slice(0, 120),
+    strengths: arr(parsed.strengths),
+    improvements: arr(parsed.improvements),
+    composition: String(parsed.composition || ""),
+    light: String(parsed.light || ""),
+    color: String(parsed.color || ""),
+    narrative: String(parsed.narrative || ""),
+    shootingAdvice: String(parsed.shootingAdvice || ""),
+    vendor,
+    model,
+  };
 }
 
 /**

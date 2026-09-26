@@ -218,10 +218,16 @@
     <section class="section section-alt" id="analyze" data-group="learn">
       <div class="section-head">
         <p class="eyebrow">COMPOSITION LAB · PRO</p>
-        <h2>上传照片 · 六维专业分析</h2>
+        <h2>上传照片 · 专业分析</h2>
         <p class="section-desc">
-          直方图、主色调、构图叠加、光线方向、技术指标一并给出。全部在浏览器本地计算，照片不会上传。
+          <strong>本地版</strong>：构图/曝光/色彩/清晰度/用光/平衡 + 直方图，离线即时。
+          <strong>AI 深度点评</strong>：大模型工作坊级细评（需厂商 Key）。可切换。
         </p>
+        <div class="mode-switch analysis-mode" id="analysisMode" role="tablist" aria-label="分析模式">
+          <button class="mode-btn active" data-amode="local" type="button">本地分析</button>
+          <button class="mode-btn" data-amode="ai" type="button">AI 深度点评</button>
+          <button class="mode-btn" data-amode="both" type="button">两者都要</button>
+        </div>
       </div>
 
       <div class="lab">
@@ -319,6 +325,29 @@
             <div class="tips-block">
               <h4>改进建议 · 按优先级</h4>
               <ul id="tipList"></ul>
+            </div>
+
+            <div class="ai-review hidden" id="aiReview">
+              <h4>AI 工作坊点评 <span class="mono" id="aiReviewMeta">—</span></h4>
+              <p class="ai-summary" id="aiSummary">—</p>
+              <div class="ai-scores" id="aiScores"></div>
+              <div class="ai-two-col">
+                <div>
+                  <h5>亮点</h5>
+                  <ul id="aiStrengths"></ul>
+                </div>
+                <div>
+                  <h5>可改进</h5>
+                  <ul id="aiImprovements"></ul>
+                </div>
+              </div>
+              <div class="ai-detail">
+                <p><strong>构图</strong> <span id="aiComposition"></span></p>
+                <p><strong>用光</strong> <span id="aiLight"></span></p>
+                <p><strong>色彩</strong> <span id="aiColor"></span></p>
+                <p><strong>叙事</strong> <span id="aiNarrative"></span></p>
+                <p><strong>下次怎么拍</strong> <span id="aiShoot"></span></p>
+              </div>
             </div>
           </div>
         </aside>
@@ -717,6 +746,12 @@
         <p class="section-desc">分析历史保存在本地，方便回顾进步轨迹。</p>
       </div>
       <div class="journal">
+        <div class="report-export-bar">
+          <button class="btn btn-primary" id="genReportBtn" type="button">生成学习报告</button>
+          <button class="btn btn-secondary" id="exportReportBtn" type="button">导出 HTML</button>
+        </div>
+        <div id="learningReportMount"></div>
+
         <div class="journal-stats" id="journalStats">
           <div class="j-stat"><strong id="jCount">0</strong><span>分析次数</span></div>
           <div class="j-stat"><strong id="jAvg">—</strong><span>平均分</span></div>
@@ -749,6 +784,7 @@
   <script src="tools.js"></script>
   <script src="quiz.js"></script>
   <script src="analyze.js"></script>
+  <script src="report.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

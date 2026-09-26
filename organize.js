@@ -73,6 +73,11 @@ function parseTiffExif(dv, buffer, le, ifdOffset, tiffBase = 0) {
     gps: null,
     make: null,
     model: null,
+    lens: null,
+    iso: null,
+    shutter: null,
+    aperture: null,
+    focal: null,
     width: 0,
     height: 0,
   };
@@ -101,7 +106,7 @@ function parseTiffExif(dv, buffer, le, ifdOffset, tiffBase = 0) {
       function readAscii() {
         if (ptr + count > buffer.byteLength) return null;
         let s = "";
-        for (let k = 0; k < count && k < 64; k++) {
+        for (let k = 0; k < count && k < 80; k++) {
           const c = dv.getUint8(ptr + k);
           if (c === 0) break;
           s += String.fromCharCode(c);
@@ -157,19 +162,29 @@ function parseTiffExif(dv, buffer, le, ifdOffset, tiffBase = 0) {
         case 34853:
           gpsIFD = dv.getUint32(valOff, le);
           break;
-        case 37500:
-          // MakerNote，忽略
-          break;
         case 40962:
           if (!out.width) out.width = dv.getUint32(valOff, le);
           break;
         case 40963:
           if (!out.height) out.height = dv.getUint32(valOff, le);
           break;
-        case 33434: // ExposureTime
-          break;
         case 34665:
           exifIFD = dv.getUint32(valOff, le);
+          break;
+        case 33434:
+          out.shutter = formatShutter(readRational());
+          break;
+        case 33437:
+          out.aperture = readRational();
+          break;
+        case 34855:
+          out.iso = type === 3 ? dv.getUint16(valOff, le) : dv.getUint32(valOff, le);
+          break;
+        case 37386:
+          out.focal = readRational();
+          break;
+        case 42036:
+          out.lens = readAscii();
           break;
         default:
           break;
@@ -190,6 +205,25 @@ function parseTiffExif(dv, buffer, le, ifdOffset, tiffBase = 0) {
 
   readIFD(ifdOffset, tiffBase, 0, false);
   return out;
+}
+
+function formatShutter(sec) {
+  if (!sec || !Number.isFinite(sec)) return null;
+  if (sec >= 1) return (Math.round(sec * 10) / 10) + "s";
+  return "1/" + Math.round(1 / sec) + "s";
+}
+
+function formatExifSummary(exif) {
+  const parts = [];
+  if (exif.make || exif.model) parts.push([exif.make, exif.model].filter(Boolean).join(" "));
+  if (exif.lens) parts.push(exif.lens);
+  const shot = [];
+  if (exif.aperture) shot.push("f/" + (Math.round(exif.aperture * 10) / 10));
+  if (exif.shutter) shot.push(exif.shutter);
+  if (exif.iso) shot.push("ISO" + exif.iso);
+  if (exif.focal) shot.push(Math.round(exif.focal) + "mm");
+  if (shot.length) parts.push(shot.join(" · "));
+  return parts.filter(Boolean).join(" | ");
 }
 
 function normalizeExifDate(s) {
