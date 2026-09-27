@@ -49,6 +49,7 @@
         </div>
         <div class="side-group">
           <div class="side-label">输出</div>
+          <a class="side-link" href="#cull">快选片</a>
           <a class="side-link" href="#watermark">水印 / 选片</a>
         </div>
       </nav>
@@ -770,6 +771,79 @@
       </div>
     </section>
 
+    <!-- Cull -->
+    <section class="section" id="cull" data-group="tool">
+      <div class="section-kicker"><span class="kicker-num">12</span><div><p class="eyebrow">FAST CULL</p><h2 class="kicker-title">快选片</h2></div><p class="kicker-desc">一天 1000+ 张也能筛：键盘 P 入选 / X 否决 / 1–5 星。本地处理。</p></div>
+
+      <div class="cull-stats" id="cullStats">
+        <div class="cull-stat"><strong id="cullCount">0</strong><span>总张数</span></div>
+        <div class="cull-stat"><strong id="cullPickCount">0</strong><span>入选</span></div>
+        <div class="cull-stat"><strong id="cullRejectCount">0</strong><span>否决</span></div>
+        <div class="cull-stat"><strong id="cullStarCount">0</strong><span>≥3 星</span></div>
+      </div>
+
+      <div class="cull-toolbar">
+        <button class="btn btn-primary sm" id="cullPickFolder" type="button">选择照片文件夹</button>
+        <button class="btn btn-secondary sm" id="cullPickFiles" type="button">选文件</button>
+        <button class="btn btn-secondary sm" id="cullSmartBtn" type="button">智能初筛</button>
+        <button class="btn btn-secondary sm" id="cullAIBtn" type="button">AI 精评</button>
+        <input type="file" id="cullFolderInput" webkitdirectory directory multiple hidden />
+        <input type="file" id="cullFileInput" accept="image/*" multiple hidden />
+        <span class="cull-sep"></span>
+        <label class="cull-filter-label">筛选
+          <select id="cullFilter">
+            <option value="all">全部</option>
+            <option value="new">未评</option>
+            <option value="pick">已入选</option>
+            <option value="reject">已否决</option>
+            <option value="star">仅高分</option>
+          </select>
+        </label>
+        <label class="cull-filter-label">星 ≥
+          <select id="cullMinStars">
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+          </select>
+        </label>
+        <span class="mono" id="cullFiltered">0 / 0</span>
+        <button class="btn btn-ghost sm" id="cullExportBtn" type="button">导出入选</button>
+        <button class="btn btn-ghost sm" id="cullBtnReset" type="button">清空</button>
+      </div>
+
+      <div class="cull-layout">
+        <div class="cull-grid-wrap">
+          <div class="cull-grid" id="cullGrid">
+            <p class="cull-empty">先把照片文件夹拖进来，或点「选择照片文件夹」</p>
+          </div>
+        </div>
+        <aside class="cull-side">
+          <div class="cull-stage" id="cullStage">
+            <p class="cull-empty">选中缩略图后这里放大</p>
+          </div>
+          <div class="cull-meta mono" id="cullMeta">—</div>
+          <div class="cull-actions">
+            <button class="btn btn-ghost sm" id="cullBtnPrev" type="button">← 上一张</button>
+            <button class="btn btn-secondary sm" id="cullBtnReject" type="button">X 否决</button>
+            <button class="btn btn-primary sm" id="cullBtnPick" type="button">P 入选</button>
+            <button class="btn btn-ghost sm" id="cullBtnNext" type="button">下一张 →</button>
+          </div>
+          <div class="cull-keys">
+            <strong>键盘</strong>
+            <span>← → 浏览</span>
+            <span>P / Enter 入选</span>
+            <span>X 删除键 否决</span>
+            <span>1–5 打星</span>
+          </div>
+          <div class="cull-drop" id="cullDrop">
+            <p>也可以把整个文件夹拖进此区域</p>
+          </div>
+          <p class="mono" id="cullStatus">未载入</p>
+          <div class="cull-log" id="cullLog"></div>
+        </aside>
+      </div>
+    </section>
+
     <!-- Watermark & Compare -->
     <section class="section section-alt" id="watermark" data-group="tool">
       <div class="section-kicker"><span class="kicker-num">07</span><div><p class="eyebrow">BATCH OUTPUT</p><h2 class="kicker-title">水印 / 选片</h2></div><p class="kicker-desc">字标 · 参数条 · 品牌 Logo · 多种版式，批量导出。</p></div>
@@ -901,6 +975,7 @@
   <script src="raw.js"></script>
   <script src="colorgrade.js"></script>
   <script src="organize.js"></script>
+  <script src="cull.js"></script>
   <script src="tools.js"></script>
   <script src="quiz.js"></script>
   <script src="analyze.js"></script>

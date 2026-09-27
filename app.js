@@ -2240,6 +2240,7 @@ function init() {
   setupModeSwitch();
   setupWatermark();
   setupCompare();
+  setupCull();
   setupAssessment();
 
   $("#clearJournalBtn").addEventListener("click", () => {
