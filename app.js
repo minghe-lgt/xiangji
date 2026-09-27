@@ -865,6 +865,9 @@ function setupGrade() {
   $("#aiToggleCfg").addEventListener("click", () => {
     $("#aiConfig").classList.toggle("hidden");
   });
+  $("#aiCfgClose")?.addEventListener("click", () => {
+    $("#aiConfig").classList.add("hidden");
+  });
 
   $("#saveLlmBtn").addEventListener("click", () => {
     const conf = {
@@ -1435,14 +1438,104 @@ function setupCalculators() {
     `;
   }
   ["#sunLat", "#sunLon", "#sunDate"].forEach((sel) => $(sel).addEventListener("input", updateSun));
-  $$(".sun-presets [data-loc]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const [la, lo] = btn.dataset.loc.split(",");
+
+  // 自定义常用地点（可保存，含内置城可删）
+  const SUN_LOC_KEY = "lightjournal.sunLocs.v2";
+  const DEFAULT_SUN_LOCS = [
+    { name: "杭州", lat: 30.25, lon: 120.16, builtin: true },
+    { name: "北京", lat: 39.9, lon: 116.4, builtin: true },
+    { name: "上海", lat: 31.23, lon: 121.47, builtin: true },
+    { name: "深圳", lat: 22.54, lon: 114.06, builtin: true },
+    { name: "东京", lat: 35.68, lon: 139.69, builtin: true },
+  ];
+
+  function loadSunLocs() {
+    try {
+      const raw = localStorage.getItem(SUN_LOC_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    return DEFAULT_SUN_LOCS.map((x) => ({ ...x }));
+  }
+  function saveSunLocs(list) {
+    localStorage.setItem(SUN_LOC_KEY, JSON.stringify(list.slice(0, 20)));
+  }
+
+  function renderSunPresets() {
+    const box = $("#sunPresets");
+    if (!box) return;
+    const locs = loadSunLocs();
+    if (!locs.length) {
+      box.innerHTML = `<span class="calc-note">没有地点了，可在下方添加或「恢复默认」</span>`;
+      return;
+    }
+    box.innerHTML = locs
+      .map(
+        (c, idx) =>
+          `<span class="chip sun-loc-chip">
+            <button type="button" class="chip-loc-btn" data-loc="${c.lat},${c.lon}">${c.name}</button>
+            <button type="button" class="del" data-del="${idx}" title="删除">×</button>
+          </span>`
+      )
+      .join("") +
+      `<button class="chip sun-restore" id="sunRestore" type="button">恢复默认</button>`;
+  }
+
+  function bindSunPresets() {
+    const box = $("#sunPresets");
+    if (!box) return;
+    box.addEventListener("click", (e) => {
+      if (e.target.closest("#sunRestore")) {
+        saveSunLocs(DEFAULT_SUN_LOCS.map((x) => ({ ...x })));
+        renderSunPresets();
+        return;
+      }
+      const del = e.target.closest("[data-del]");
+      if (del) {
+        const idx = Number(del.dataset.del);
+        const list = loadSunLocs();
+        list.splice(idx, 1);
+        saveSunLocs(list);
+        renderSunPresets();
+        return;
+      }
+      const locEl = e.target.closest("[data-loc]");
+      if (!locEl) return;
+      const [la, lo] = locEl.dataset.loc.split(",");
       $("#sunLat").value = la;
       $("#sunLon").value = lo;
       updateSun();
     });
+  }
+
+  $("#sunAddBtn")?.addEventListener("click", () => {
+    $("#sunAddRow")?.classList.toggle("hidden");
+    $("#sunLocName")?.focus();
   });
+
+  $("#sunLocSave")?.addEventListener("click", () => {
+    const name = ($("#sunLocName")?.value || "").trim();
+    const lat = Number($("#sunLocLat")?.value);
+    const lon = Number($("#sunLocLon")?.value);
+    if (!name) return alert("请填写地点名称");
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return alert("请填写有效经纬度");
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return alert("经纬度超出范围");
+    const list = loadSunLocs();
+    list.unshift({ name: name.slice(0, 12), lat, lon, builtin: false });
+    saveSunLocs(list);
+    renderSunPresets();
+    $("#sunLat").value = lat;
+    $("#sunLon").value = lon;
+    $("#sunLocName").value = "";
+    $("#sunLocLat").value = "";
+    $("#sunLocLon").value = "";
+    $("#sunAddRow").classList.add("hidden");
+    updateSun();
+  });
+
+  renderSunPresets();
+  bindSunPresets();
   updateSun();
 
   // calc tabs
@@ -1476,10 +1569,93 @@ function setupWatermark() {
   const drop = $("#wmDrop");
   const input = $("#wmFiles");
   let files = [];
+  let wmType = "text";
+  let wmStyle = "br";
+  let logoImage = null;
+
+  // 文字与常用设置：填过就记住，除非自己改
+  const WM_TEXT_KEY = "lightjournal.wmText";
+  const wmTextEl = $("#wmText");
+  const savedText = localStorage.getItem(WM_TEXT_KEY);
+  if (savedText != null && wmTextEl) wmTextEl.value = savedText;
+  wmTextEl?.addEventListener("change", () => {
+    localStorage.setItem(WM_TEXT_KEY, wmTextEl.value);
+  });
+  wmTextEl?.addEventListener("blur", () => {
+    localStorage.setItem(WM_TEXT_KEY, wmTextEl.value);
+  });
 
   function refreshStatus() {
     $("#wmStatus").textContent = files.length ? `已选 ${files.length} 张` : "未选择文件";
   }
+
+  $("#wmTypeCards")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-wtype]");
+    if (!btn) return;
+    wmType = btn.dataset.wtype;
+    $$("#wmTypeCards .wm-card").forEach((b) => b.classList.toggle("active", b === btn));
+    // 样式默认
+    if (wmType === "exif") wmStyle = "bar";
+    else if (wmType === "frame" || wmType === "tile") wmStyle = "br";
+    else if (wmType === "combo") wmStyle = "bl";
+    const posSel = $("#wmPos");
+    if (posSel) posSel.value = wmStyle === "bar" ? "bar" : wmStyle;
+  });
+
+  $("#wmPos")?.addEventListener("change", (e) => {
+    wmStyle = e.target.value;
+  });
+
+  $("#wmLogoFile")?.addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = () => {
+      logoImage = img;
+      const pre = $("#wmLogoPreview");
+      pre.src = url;
+      pre.classList.remove("hidden");
+      $("#wmLogoStatus").textContent = `Logo：${f.name.slice(0, 18)}`;
+    };
+    img.src = url;
+  });
+
+  $("#wmLogoClear")?.addEventListener("click", () => {
+    logoImage = null;
+    $("#wmLogoPreview").classList.add("hidden");
+    $("#wmLogoStatus").textContent = "未上传 Logo（可选）";
+    $("#wmLogoFile").value = "";
+  });
+
+  $("#wmSavePreset")?.addEventListener("click", () => {
+    saveWmPreset({
+      type: wmType,
+      style: wmStyle,
+      text: $("#wmText").value,
+      sub: $("#wmSub").value,
+      opacity: Number($("#wmOpacity").value),
+      size: Number($("#wmSize").value),
+      showExif: $("#wmShowExif").checked,
+    });
+    alert("水印样式已保存到本机");
+  });
+
+  $("#wmLoadPreset")?.addEventListener("click", () => {
+    const p = loadWmPreset();
+    if (!p) return alert("还没有保存过水印样式");
+    wmType = p.type || "text";
+    wmStyle = p.style || "br";
+    $("#wmText").value = p.text || "";
+    $("#wmSub").value = p.sub || "";
+    $("#wmOpacity").value = p.opacity ?? 65;
+    $("#wmSize").value = p.size ?? 36;
+    $("#wmShowExif").checked = !!p.showExif;
+    $$("#wmTypeCards .wm-card").forEach((b) => b.classList.toggle("active", b.dataset.wtype === wmType));
+    const posSel = $("#wmPos");
+    if (posSel) posSel.value = wmStyle === "bar" ? "bar" : wmStyle;
+    alert("已套用");
+  });
 
   $("#wmPickBtn").addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1516,12 +1692,6 @@ function setupWatermark() {
       alert("请先选择图片");
       return;
     }
-    const opt = {
-      text: $("#wmText").value || "© 光影手帐",
-      position: $("#wmPos").value,
-      opacity: Number($("#wmOpacity").value) / 100,
-      size: Number($("#wmSize").value) / 1000,
-    };
     const btn = $("#wmRunBtn");
     btn.disabled = true;
     btn.textContent = "处理中…";
@@ -1529,19 +1699,42 @@ function setupWatermark() {
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         try {
+          // EXIF
+          let exif = null;
+          try {
+            const buf = await readFileAsArrayBuffer(f, 8 * 1024 * 1024);
+            exif = parseExifFromArrayBuffer(buf);
+          } catch {
+            /* ignore */
+          }
           const img = await fileToImage(f);
           const c = document.createElement("canvas");
           c.width = img.naturalWidth;
           c.height = img.naturalHeight;
           c.getContext("2d").drawImage(img, 0, 0);
-          applyTextWatermark(c, opt);
-          const blob = await exportCanvasJPEG(c, 0.92);
+
+          drawWatermark(c, {
+            type: wmType,
+            style: wmStyle,
+            text: $("#wmText").value.trim() || "© 摄影",
+            sub: $("#wmSub").value || "",
+            opacity: Number($("#wmOpacity").value),
+            size: Number($("#wmSize").value),
+            showExif: $("#wmShowExif").checked,
+            logoImage,
+            exif: formatExifWatermark(exif),
+          });
+
+          const blob = $("#wmUsePng")?.checked
+            ? await exportCanvasPNG(c)
+            : await exportCanvasJPEG(c, 0.95);
           if (img._objectUrl) URL.revokeObjectURL(img._objectUrl);
           if (blob) {
             const base = f.name.replace(/\.[^.]+$/, "");
-            downloadBlob(blob, `${base}-wm.jpg`);
-            $("#wmStatus").textContent = `已导出 ${i + 1} / ${files.length}`;
-            await new Promise((r) => setTimeout(r, 180));
+            const ext = blob.type === "image/png" ? "png" : "jpg";
+            downloadBlob(blob, `${base}-wm.${ext}`);
+            $("#wmStatus").textContent = `已导出 ${i + 1} / ${files.length}（${ext.toUpperCase()}${ext === "png" ? "·无损" : ""}）`;
+            await new Promise((r) => setTimeout(r, 160));
           }
         } catch (e) {
           console.warn(e);

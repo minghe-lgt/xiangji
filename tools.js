@@ -222,43 +222,216 @@ function fmtTime(d) {
 }
 
 /* ========== 水印 ========== */
+/* ========== 水印（多版式 / 参数条 / Logo / 平铺 / 白边） ========== */
+const WM_PRESET_KEY = "lightjournal.wmPreset";
+
+function loadWmPreset() {
+  try {
+    return JSON.parse(localStorage.getItem(WM_PRESET_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveWmPreset(cfg) {
+  localStorage.setItem(WM_PRESET_KEY, JSON.stringify({ ...cfg, logo: undefined }));
+}
+
 /**
- * 在画布右下角/指定角绘制文字水印
+ * 绘制水印
  * @param {HTMLCanvasElement} canvas
- * @param {{text:string, position:string, opacity:number, size:number, color:string}} opt
+ * @param {{
+ *   type: 'text'|'exif'|'logo'|'combo'|'tile'|'frame',
+ *   style: 'br'|'bl'|'tr'|'c'|'bar',
+ *   text: string, sub: string, opacity: number, size: number,
+ *   showExif: boolean, logoImage?: HTMLImageElement|null,
+ *   exif?: {aperture?:string,shutter?:string,iso?:string,focal?:string} | null
+ * }} opt
  */
-function applyTextWatermark(canvas, opt) {
+function drawWatermark(canvas, opt) {
+  const o = {
+    type: opt.type || "text",
+    style: opt.style || "br",
+    text: opt.text || "© 光影手帐",
+    sub: opt.sub || "",
+    opacity: (opt.opacity ?? 60) / 100,
+    size: (opt.size ?? 36) / 1000,
+    showExif: !!opt.showExif,
+    logoImage: opt.logoImage || null,
+    exif: opt.exif || null,
+  };
+
+  if (o.type === "frame") return drawFrameBorder(canvas, o);
+  if (o.type === "tile") return drawTileWatermark(canvas, o);
+
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
   const h = canvas.height;
-  const fontSize = Math.round(Math.min(w, h) * (opt.size || 0.035));
-  const pad = Math.round(fontSize * 0.8);
+  const base = Math.min(w, h);
 
   ctx.save();
-  ctx.globalAlpha = (opt.opacity ?? 0.55);
-  ctx.fillStyle = opt.color || "#ffffff";
-  ctx.font = `500 ${fontSize}px "Noto Sans SC", system-ui, sans-serif`;
-  ctx.textBaseline = "middle";
+  ctx.globalAlpha = o.opacity;
 
-  const metrics = ctx.measureText(opt.text || "光影手帐");
-  const tw = metrics.width;
-  const th = fontSize;
+  const exifLine = o.exif
+    ? [o.exif.aperture && `f/${String(o.exif.aperture).replace(/^f\//, "")}`, o.exif.shutter, o.exif.iso && `ISO${o.exif.iso}`, o.exif.focal && `${o.exif.focal}`]
+        .filter(Boolean)
+        .join("  ·  ")
+    : "";
 
-  let x = pad;
-  let y = h - pad - th / 2;
-  if ((opt.position || "br").includes("r")) x = w - pad - tw;
-  if ((opt.position || "br").includes("t")) y = pad + th / 2;
-  if ((opt.position || "br").includes("c") && !opt.position?.includes("t") && !opt.position?.includes("b")) {
-    y = h / 2;
-    x = (w - tw) / 2;
+  if (o.type === "logo" && o.logoImage) {
+    drawLogo(ctx, o.logoImage, w, h, o.style, base);
+  } else if (o.type === "exif") {
+    drawExifBar(ctx, w, h, exifLine || o.text, o);
+  } else if (o.type === "combo") {
+    drawCombo(ctx, w, h, o, exifLine);
+  } else {
+    drawTextMark(ctx, w, h, o, exifLine);
   }
 
-  // 阴影描边提升可读性
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = fontSize * 0.15;
-  ctx.fillText(opt.text || "光影手帐", x, y);
   ctx.restore();
   return canvas;
+}
+
+function shadowText(ctx, text, x, y, font, fill, align = "left") {
+  ctx.font = font;
+  ctx.textAlign = align;
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = Math.max(4, parseInt(font) * 0.12);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+  ctx.shadowBlur = 0;
+}
+
+function drawTextMark(ctx, w, h, o, exifLine) {
+  const fontSize = Math.round(Math.min(w, h) * o.size);
+  const pad = Math.round(fontSize * 0.9);
+  const font = `500 ${fontSize}px "Noto Sans SC", system-ui, sans-serif`;
+  let x = pad;
+  let y = h - pad;
+  if (o.style === "bl") x = pad;
+  else if (o.style === "tr") { x = w - pad; y = pad; }
+  else if (o.style === "c") { x = w / 2; y = h / 2; }
+  else x = w - pad;
+
+  const align = o.style === "bl" ? "left" : o.style === "tr" || o.style === "br" ? "right" : "center";
+  shadowText(ctx, o.text, x, y, font, "#ffffff", align);
+  if (o.sub) {
+    shadowText(ctx, o.sub, x, y + fontSize * 1.25, `${Math.round(fontSize * 0.55)}px system-ui`, "rgba(255,255,255,0.85)", align);
+  }
+  if (o.showExif && exifLine) {
+    shadowText(ctx, exifLine, x, y + (o.sub ? fontSize * 2 : fontSize * 1.3), `${Math.round(fontSize * 0.5)}px "JetBrains Mono", monospace`, "rgba(255,255,255,0.75)", align);
+  }
+}
+
+function drawExifBar(ctx, w, h, line, o) {
+  const fontSize = Math.round(Math.min(w, h) * o.size * 0.55);
+  const barH = Math.round(fontSize * 2.2);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(0, h - barH, w, barH);
+  shadowText(ctx, line, w / 2, h - barH / 2, `500 ${fontSize}px "JetBrains Mono", monospace`, "#f0e9de", "center");
+  if (o.text) {
+    shadowText(ctx, o.text, w / 2, h - barH - fontSize * 0.9, `500 ${Math.round(fontSize * 0.95)}px system-ui`, "#ffffff", "center");
+  }
+}
+
+function drawCombo(ctx, w, h, o, exifLine) {
+  const pad = Math.round(Math.min(w, h) * 0.035);
+  const fontSize = Math.round(Math.min(w, h) * o.size * 0.7);
+  // logo left
+  if (o.logoImage) {
+    const lh = fontSize * 1.5;
+    const ratio = o.logoImage.width / o.logoImage.height || 1;
+    const lw = lh * ratio;
+    ctx.globalAlpha = o.opacity * 0.95;
+    ctx.drawImage(o.logoImage, pad, h - pad - lh, lw, lh);
+  }
+  const x = o.logoImage ? pad + fontSize * 2.2 : pad;
+  shadowText(ctx, o.text, x, h - pad - fontSize * 0.2, `600 ${fontSize}px system-ui`, "#ffffff", "left");
+  if (o.sub) {
+    shadowText(ctx, o.sub, x, h - pad + fontSize * 0.9, `400 ${Math.round(fontSize * 0.55)}px system-ui`, "rgba(255,255,255,0.8)", "left");
+  }
+  if (o.showExif && exifLine) {
+    shadowText(ctx, exifLine, w - pad, h - pad, `500 ${Math.round(fontSize * 0.5)}px monospace`, "rgba(255,255,255,0.8)", "right");
+  }
+}
+
+function drawLogo(ctx, logo, w, h, style, base) {
+  const maxH = base * 0.12;
+  const ratio = logo.width / logo.height || 1;
+  const lh = maxH;
+  const lw = lh * ratio;
+  const pad = base * 0.04;
+  let x = w - pad - lw;
+  let y = h - pad - lh;
+  if (style === "bl") x = pad;
+  else if (style === "tr") { x = w - pad - lw; y = pad; }
+  else if (style === "c") { x = (w - lw) / 2; y = (h - lh) / 2; }
+  ctx.drawImage(logo, x, y, lw, lh);
+}
+
+function drawTileWatermark(canvas, o) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  const fontSize = Math.round(Math.min(w, h) * o.size * 0.9);
+  ctx.save();
+  ctx.globalAlpha = o.opacity;
+  ctx.font = `600 ${fontSize}px system-ui`;
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const gapX = fontSize * 8;
+  const gapY = fontSize * 3.5;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(-Math.PI / 7);
+  for (let y = -h; y < h; y += gapY) {
+    for (let x = -w; x < w; x += gapX) {
+      ctx.fillText(o.text, x + ((y / gapY) % 2) * (gapX / 2), y);
+    }
+  }
+  ctx.restore();
+  return canvas;
+}
+
+function drawFrameBorder(canvas, o) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  const base = Math.min(w, h);
+  const m = Math.round(base * 0.035);
+  const bar = Math.round(base * 0.085);
+  const out = document.createElement("canvas");
+  out.width = w + m * 2;
+  out.height = h + m + bar;
+  const octx = out.getContext("2d");
+  octx.fillStyle = "#f7f2ea";
+  octx.fillRect(0, 0, out.width, out.height);
+  octx.drawImage(canvas, m, m);
+  // caption
+  octx.globalAlpha = 1;
+  const fs = Math.round(bar * 0.38);
+  shadowText(octx, o.text, m, m + h + bar / 2, `500 ${fs}px system-ui`, "#2a241c", "left");
+  if (o.showExif && o.exif) {
+    const line = [o.exif.aperture && `f/${String(o.exif.aperture).replace(/^f\//, "")}`, o.exif.shutter, o.exif.iso && `ISO${o.exif.iso}`, o.exif.focal]
+      .filter(Boolean)
+      .join("  ·  ");
+    shadowText(octx, line, out.width - m, m + h + bar / 2, `400 ${Math.round(fs * 0.85)}px monospace`, "#8a7d6c", "right");
+  }
+  // replace canvas content
+  canvas.width = out.width;
+  canvas.height = out.height;
+  canvas.getContext("2d").drawImage(out, 0, 0);
+}
+
+function formatExifWatermark(exif) {
+  if (!exif) return null;
+  return {
+    aperture: exif.aperture ? (typeof exif.aperture === "number" ? exif.aperture : String(exif.aperture).replace(/^f\//, "")) : "",
+    shutter: exif.shutter || "",
+    iso: exif.iso ? String(exif.iso).replace(/^ISO/i, "") : "",
+    focal: exif.focal ? (typeof exif.focal === "number" ? Math.round(exif.focal) + "mm" : exif.focal) : "",
+  };
 }
 
 /* ========== 选片对比评分 ========== */
