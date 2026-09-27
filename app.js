@@ -267,12 +267,12 @@ function renderJournal() {
       .map(
         (item) => `
       <div class="j-item">
-        <img class="j-thumb" src="${item.thumb}" alt="" />
-        <div>
-          <h4>${item.name}</h4>
-          <p>${item.date} · ${item.grade} · ${item.topTip}</p>
+        <img class="j-thumb" src="${item.thumb || ""}" alt="" />
+        <div class="j-main">
+          <h4>${item.name || "未命名"}</h4>
+          <p>${item.date || ""} · ${item.grade || ""} · ${(item.topTip || "").replace(/</g, "&lt;")}</p>
         </div>
-        <div class="j-score">${item.score}</div>
+        <div class="j-score">${item.score ?? "—"}</div>
       </div>
     `
       )
@@ -2152,8 +2152,79 @@ function setupAssessment() {
   renderQuiz();
 }
 
+/* ========== Sidebar ========== */
+function setupSidebar() {
+  const sidebar = $("#sidebar");
+  const backdrop = $("#sideBackdrop");
+  const toggle = $("#sideToggle");
+  const close = $("#sideClose");
+  if (!sidebar || !toggle) return;
+
+  function openSide() {
+    sidebar.classList.add("open");
+    if (backdrop) backdrop.classList.remove("hidden");
+  }
+  function closeSide() {
+    sidebar.classList.remove("open");
+    if (backdrop) backdrop.classList.add("hidden");
+  }
+  function toggleSide() {
+    if (sidebar.classList.contains("open")) closeSide();
+    else openSide();
+  }
+
+  toggle.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSide();
+  });
+  close?.addEventListener("click", closeSide);
+  backdrop?.addEventListener("click", closeSide);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSide();
+  });
+
+  // 滚动高亮
+  const links = $$(".side-link");
+  const map = links
+    .map((a) => {
+      const id = (a.getAttribute("href") || "").replace("#", "");
+      const el = id ? document.getElementById(id) : null;
+      return el ? { a, el } : null;
+    })
+    .filter(Boolean);
+
+  function onScroll() {
+    let current = map[0];
+    for (const item of map) {
+      const top = item.el.getBoundingClientRect().top;
+      if (top <= 120) current = item;
+    }
+    if (!current) return;
+    links.forEach((a) => a.classList.toggle("active", a === current.a));
+    const title = $("#topbarTitle");
+    if (title) title.textContent = current.a.textContent.trim();
+  }
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  links.forEach((a) =>
+    a.addEventListener("click", () => {
+      if (window.innerWidth <= 980) closeSide();
+    })
+  );
+
+  $("#openAssessSide")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeSide();
+    document.querySelector("#openAssessBtn")?.click();
+  });
+}
+
 /* ========== Boot ========== */
 function init() {
+  setupSidebar();
   renderPath();
   renderStageFilter();
   renderPlan();

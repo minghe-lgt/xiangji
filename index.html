@@ -16,31 +16,58 @@
 
   <div class="grain" aria-hidden="true"></div>
 
-  <header class="site-header">
-    <a class="brand" href="#top">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-text">光影手帐</span>
-    </a>
-    <div class="mode-switch" id="modeSwitch" role="tablist" aria-label="视图切换">
-      <button class="mode-btn active" data-mode="all" type="button">全部</button>
-      <button class="mode-btn" data-mode="learn" type="button">学习</button>
-      <button class="mode-btn" data-mode="tool" type="button">工具</button>
-    </div>
-    <nav class="nav" id="mainNav">
-      <a href="#plan" data-group="learn">训练体系</a>
-      <a href="#analyze" data-group="learn">照片分析</a>
-      <a href="#grade" data-group="tool">调色</a>
-      <a href="#tools" data-group="tool">拍摄计算</a>
-      <a href="#watermark" data-group="tool">水印 / 对比</a>
-      <a href="#organize" data-group="tool">照片管家</a>
-      <a href="#drills" data-group="learn">日常练习</a>
-      <a href="#cheatsheet" data-group="learn">构图速查</a>
-    </nav>
-    <button class="btn btn-ghost" id="scrollTopBtn" type="button">回到顶部</button>
-  </header>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-brand">
+        <a class="brand" href="#top">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-text">光影手帐</span>
+        </a>
+        <button class="side-close" id="sideClose" type="button" aria-label="关闭">✕</button>
+      </div>
+
+      <nav class="side-nav">
+        <div class="side-group">
+          <div class="side-label">总览</div>
+          <a class="side-link active" href="#top">仪表盘</a>
+        </div>
+        <div class="side-group">
+          <div class="side-label">学习</div>
+          <a class="side-link" href="#plan">24 周训练</a>
+          <a class="side-link" href="#assess-trigger" id="openAssessSide">能力诊断</a>
+          <a class="side-link" href="#analyze">照片分析</a>
+          <a class="side-link" href="#drills">日常快练</a>
+          <a class="side-link" href="#cheatsheet">构图速查</a>
+          <a class="side-link" href="#library">书单课单</a>
+          <a class="side-link" href="#progress">学习记录</a>
+        </div>
+        <div class="side-group">
+          <div class="side-label">拍摄工具</div>
+          <a class="side-link" href="#grade">调色工作台</a>
+          <a class="side-link" href="#tools">拍摄计算器</a>
+          <a class="side-link" href="#organize">照片管家</a>
+        </div>
+        <div class="side-group">
+          <div class="side-label">输出</div>
+          <a class="side-link" href="#watermark">水印 / 选片</a>
+        </div>
+      </nav>
+
+      <div class="side-foot">
+        <p class="side-note">本地运行 · 照片不上传</p>
+      </div>
+    </aside>
+    <div class="side-backdrop hidden" id="sideBackdrop"></div>
+
+    <div class="app-main">
+      <header class="topbar">
+        <button class="btn btn-ghost sm side-toggle" id="sideToggle" type="button">☰ 菜单</button>
+        <div class="topbar-title" id="topbarTitle">仪表盘</div>
+        <button class="btn btn-ghost sm" id="scrollTopBtn" type="button">回到顶部</button>
+      </header>
 
   <main id="top">
-    <!-- Hero -->
+<!-- Hero -->
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">PHOTOGRAPHY CURRICULUM · 24 WEEKS</p>
@@ -101,6 +128,32 @@
       </div>
     </section>
 
+<!-- Quick entries -->
+    <section class="section section-tight">
+      <div class="quick-grid">
+        <a class="quick-card" href="#plan">
+          <span class="q-num">01</span>
+          <strong>继续训练</strong>
+          <span>24 周体系 · 能力诊断</span>
+        </a>
+        <a class="quick-card" href="#analyze">
+          <span class="q-num">02</span>
+          <strong>分析照片</strong>
+          <span>本地六维 / AI 点评</span>
+        </a>
+        <a class="quick-card" href="#grade">
+          <span class="q-num">03</span>
+          <strong>调色修图</strong>
+          <span>预设 · 曲线 · HSL</span>
+        </a>
+        <a class="quick-card" href="#tools">
+          <span class="q-num">04</span>
+          <strong>出片工具</strong>
+          <span>计算器 · 水印 · 整理</span>
+        </a>
+      </div>
+    </section>
+
     <!-- Path overview -->
     <section class="section section-tight" id="path" data-group="learn">
       <div class="section-kicker">
@@ -139,7 +192,7 @@
       <div class="stage-blocks" id="stageBlocks"></div>
     </section>
 
-    <!-- Ability Assessment (modal) -->
+<!-- Ability Assessment (modal) -->
     <div class="assess-overlay hidden" id="assessOverlay" data-group="learn">
       <div class="assess-modal" role="dialog" aria-label="能力诊断">
         <header class="assess-modal-head">
@@ -226,7 +279,6 @@
     <!-- Photo Analysis -->
     <section class="section section-alt" id="analyze" data-group="learn">
       <div class="section-kicker"><span class="kicker-num">03</span><div><p class="eyebrow">COMPOSITION LAB</p><h2 class="kicker-title">专业分析</h2></div><p class="kicker-desc">本地六维 + 可选 AI 深度点评，构图曝光一目了然。</p></div>
-      </div>
 
       <div class="lab">
         <div class="lab-upload" id="dropZone">
@@ -352,6 +404,55 @@
       </div>
     </section>
 
+    <!-- Drills -->
+    <section class="section" id="drills" data-group="learn">
+      <div class="section-kicker"><span class="kicker-num">08</span><div><p class="eyebrow">DAILY DRILLS</p><h2 class="kicker-title">日常快练</h2></div><p class="kicker-desc">10–30 分钟刻意练习，不求多只求准。</p></div>
+      <div class="drill-grid" id="drillGrid"></div>
+    </section>
+
+    <!-- Cheat sheet -->
+    <section class="section" id="cheatsheet" data-group="learn">
+      <div class="section-kicker"><span class="kicker-num">10</span><div><p class="eyebrow">FIELD NOTES</p><h2 class="kicker-title">构图速查</h2></div><p class="kicker-desc">现场扫一眼就能用的九条法则。</p></div>
+      <div class="cheat-grid" id="cheatGrid"></div>
+    </section>
+
+    <!-- Library -->
+    <section class="section section-alt" id="library" data-group="learn">
+      <div class="section-kicker"><span class="kicker-num">09</span><div><p class="eyebrow">READING</p><h2 class="kicker-title">书单课单</h2></div><p class="kicker-desc">经典教材与系统课，先地基后风格。</p></div>
+      <div class="library-list" id="libraryList"></div>
+    </section>
+
+    <!-- Progress -->
+    <section class="section section-alt" id="progress" data-group="learn">
+      <div class="section-kicker"><span class="kicker-num">11</span><div><p class="eyebrow">JOURNAL</p><h2 class="kicker-title">学习记录</h2></div><p class="kicker-desc">进度、作品与学习报告都在这里。</p></div>
+      <div class="journal">
+        <div class="journal-stats" id="journalStats">
+          <div class="j-stat"><strong id="jCount">0</strong><span>分析次数</span></div>
+          <div class="j-stat"><strong id="jAvg">—</strong><span>平均分</span></div>
+          <div class="j-stat"><strong id="jBest">—</strong><span>最高分</span></div>
+          <div class="j-stat"><strong id="jWeeks">0</strong><span>完成周数</span></div>
+        </div>
+
+        <div class="journal-row">
+          <h3 class="journal-h">学习报告</h3>
+          <div class="report-export-bar">
+            <button class="btn btn-primary sm" id="genReportBtn" type="button">生成报告</button>
+            <button class="btn btn-secondary sm" id="exportReportBtn" type="button">导出 HTML</button>
+          </div>
+          <div id="learningReportMount"></div>
+          <p class="journal-hint">点「生成报告」后，这里会出现完整报告。</p>
+        </div>
+
+        <div class="journal-row">
+          <h3 class="journal-h">最近分析</h3>
+          <div class="journal-list" id="journalList">
+            <p class="journal-empty">还没有记录。上传第一张照片开始吧。</p>
+          </div>
+          <button class="btn btn-ghost sm" id="clearJournalBtn" type="button">清空记录</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Color Grading Studio -->
     <section class="section" id="grade" data-group="tool">
       <div class="section-kicker"><span class="kicker-num">04</span><div><p class="eyebrow">COLOR GRADING</p><h2 class="kicker-title">调色工作台</h2></div><p class="kicker-desc">预设 / 曲线 / HSL / 分离色调，或用 AI 按意图出参。</p></div>
@@ -473,74 +574,6 @@
             </div>
           </aside>
         </div>
-      </div>
-    </section>
-    </section>
-
-    <!-- Photo Organizer -->
-    <section class="section section-alt" id="organize" data-group="tool">
-      <div class="section-kicker"><span class="kicker-num">06</span><div><p class="eyebrow">PHOTO BUTLER</p><h2 class="kicker-title">照片管家</h2></div><p class="kicker-desc">本地扫描、自动分类、按规则改名写回 <i class="lossless-tag">原文件复制 · 无损</i></p></div>
-
-      <div class="org-layout">
-        <div class="org-main">
-          <div class="org-toolbar">
-            <button class="btn btn-primary" id="orgScanBtn" type="button">1 · 选择照片文件夹</button>
-            <button class="btn btn-secondary" id="orgDestBtn" type="button">2 · 选择输出位置</button>
-            <button class="btn btn-primary" id="orgRunBtn" type="button">3 · 一键整理</button>
-            <button class="btn btn-ghost" id="orgResetBtn" type="button">重置</button>
-          </div>
-
-          <div class="org-rules">
-            <h3>命名与归类规则</h3>
-            <div class="rule-grid">
-              <div class="rule-item">
-                <span class="rule-label">目录</span>
-                <code>YYYY-MM / 类型 /</code>
-                <span class="rule-hint">例：2026-03 / 人像 /</span>
-              </div>
-              <div class="rule-item">
-                <span class="rule-label">文件名</span>
-                <code>YYYYMMDD_HHmm_类型_地点_序号.ext</code>
-                <span class="rule-hint">例：20260326_1432_人像_西湖_001.jpg</span>
-              </div>
-              <div class="rule-item">
-                <span class="rule-label">类型</span>
-                <code>人像 / 风光 / 夜景 / 街拍 / 静物 / 文档 / 未分类</code>
-                <span class="rule-hint">依据画面特征 + 文件名启发式</span>
-              </div>
-              <div class="rule-item">
-                <span class="rule-label">时间</span>
-                <code>优先 EXIF DateTimeOriginal，否则文件修改时间</code>
-                <span class="rule-hint">默认只整理「今天」的照片</span>
-              </div>
-            </div>
-
-            <label class="org-field">
-              <span>地点标签（写入文件名，可空）</span>
-              <input type="text" id="orgLocation" placeholder="例如：西湖 / 公司 / 东京" maxlength="12" />
-            </label>
-            <label class="org-field check-field">
-              <input type="checkbox" id="orgTodayOnly" checked />
-              <span>只整理今天拍的照片（取消则处理全部图片）</span>
-            </label>
-          </div>
-
-          <div class="org-status" id="orgStatus">
-            尚未扫描。点「选择照片文件夹」开始。
-          </div>
-        </div>
-
-        <aside class="org-side">
-          <div class="org-stat-row">
-            <div class="org-stat"><strong id="orgScanCount">0</strong><span>扫描到</span></div>
-            <div class="org-stat"><strong id="orgMatchCount">0</strong><span>今日匹配</span></div>
-            <div class="org-stat"><strong id="orgDoneCount">0</strong><span>已整理</span></div>
-          </div>
-          <div class="org-preview" id="orgPreview">
-            <p class="org-empty">预览列表会出现在这里</p>
-          </div>
-          <div class="org-log" id="orgLog"></div>
-        </aside>
       </div>
     </section>
 
@@ -670,6 +703,73 @@
       </div>
     </section>
 
+    <!-- Photo Organizer -->
+    <section class="section section-alt" id="organize" data-group="tool">
+      <div class="section-kicker"><span class="kicker-num">06</span><div><p class="eyebrow">PHOTO BUTLER</p><h2 class="kicker-title">照片管家</h2></div><p class="kicker-desc">本地扫描、自动分类、按规则改名写回 <i class="lossless-tag">原文件复制 · 无损</i></p></div>
+
+      <div class="org-layout">
+        <div class="org-main">
+          <div class="org-toolbar">
+            <button class="btn btn-primary" id="orgScanBtn" type="button">1 · 选择照片文件夹</button>
+            <button class="btn btn-secondary" id="orgDestBtn" type="button">2 · 选择输出位置</button>
+            <button class="btn btn-primary" id="orgRunBtn" type="button">3 · 一键整理</button>
+            <button class="btn btn-ghost" id="orgResetBtn" type="button">重置</button>
+          </div>
+
+          <div class="org-rules">
+            <h3>命名与归类规则</h3>
+            <div class="rule-grid">
+              <div class="rule-item">
+                <span class="rule-label">目录</span>
+                <code>YYYY-MM / 类型 /</code>
+                <span class="rule-hint">例：2026-03 / 人像 /</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">文件名</span>
+                <code>YYYYMMDD_HHmm_类型_地点_序号.ext</code>
+                <span class="rule-hint">例：20260326_1432_人像_西湖_001.jpg</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">类型</span>
+                <code>人像 / 风光 / 夜景 / 街拍 / 静物 / 文档 / 未分类</code>
+                <span class="rule-hint">依据画面特征 + 文件名启发式</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">时间</span>
+                <code>优先 EXIF DateTimeOriginal，否则文件修改时间</code>
+                <span class="rule-hint">默认只整理「今天」的照片</span>
+              </div>
+            </div>
+
+            <label class="org-field">
+              <span>地点标签（写入文件名，可空）</span>
+              <input type="text" id="orgLocation" placeholder="例如：西湖 / 公司 / 东京" maxlength="12" />
+            </label>
+            <label class="org-field check-field">
+              <input type="checkbox" id="orgTodayOnly" checked />
+              <span>只整理今天拍的照片（取消则处理全部图片）</span>
+            </label>
+          </div>
+
+          <div class="org-status" id="orgStatus">
+            尚未扫描。点「选择照片文件夹」开始。
+          </div>
+        </div>
+
+        <aside class="org-side">
+          <div class="org-stat-row">
+            <div class="org-stat"><strong id="orgScanCount">0</strong><span>扫描到</span></div>
+            <div class="org-stat"><strong id="orgMatchCount">0</strong><span>今日匹配</span></div>
+            <div class="org-stat"><strong id="orgDoneCount">0</strong><span>已整理</span></div>
+          </div>
+          <div class="org-preview" id="orgPreview">
+            <p class="org-empty">预览列表会出现在这里</p>
+          </div>
+          <div class="org-log" id="orgLog"></div>
+        </aside>
+      </div>
+    </section>
+
     <!-- Watermark & Compare -->
     <section class="section section-alt" id="watermark" data-group="tool">
       <div class="section-kicker"><span class="kicker-num">07</span><div><p class="eyebrow">BATCH OUTPUT</p><h2 class="kicker-title">水印 / 选片</h2></div><p class="kicker-desc">字标 · 参数条 · 品牌 Logo · 多种版式，批量导出。</p></div>
@@ -786,58 +886,16 @@
       </div>
     </section>
 
-    <!-- Drills -->
-    <section class="section" id="drills" data-group="learn">
-      <div class="section-kicker"><span class="kicker-num">08</span><div><p class="eyebrow">DAILY DRILLS</p><h2 class="kicker-title">日常快练</h2></div><p class="kicker-desc">10–30 分钟刻意练习，不求多只求准。</p></div>
-      <div class="drill-grid" id="drillGrid"></div>
-    </section>
-
-    <!-- Library -->
-    <section class="section section-alt" id="library" data-group="learn">
-      <div class="section-kicker"><span class="kicker-num">09</span><div><p class="eyebrow">READING</p><h2 class="kicker-title">书单课单</h2></div><p class="kicker-desc">经典教材与系统课，先地基后风格。</p></div>
-      <div class="library-list" id="libraryList"></div>
-    </section>
-
-    <!-- Cheat sheet -->
-    <section class="section" id="cheatsheet" data-group="learn">
-      <div class="section-kicker"><span class="kicker-num">10</span><div><p class="eyebrow">FIELD NOTES</p><h2 class="kicker-title">构图速查</h2></div><p class="kicker-desc">现场扫一眼就能用的九条法则。</p></div>
-      <div class="cheat-grid" id="cheatGrid"></div>
-    </section>
-
-    <!-- Progress -->
-    <section class="section section-alt" id="progress" data-group="learn">
-      <div class="section-kicker"><span class="kicker-num">11</span><div><p class="eyebrow">JOURNAL</p><h2 class="kicker-title">学习记录</h2></div><p class="kicker-desc">进度、作品与学习报告都在这里。</p></div>
-      <div class="journal">
-        <div class="report-export-bar">
-          <button class="btn btn-primary" id="genReportBtn" type="button">生成学习报告</button>
-          <button class="btn btn-secondary" id="exportReportBtn" type="button">导出 HTML</button>
+</main>
+      <footer class="site-footer">
+        <div>
+          <strong>光影手帐</strong>
+          <p>本地运行的摄影训练与专业构图分析工具。课程结构参考纽摄教材、Freeman、Peterson 与 B 站公开系统课。照片不会上传到任何服务器。</p>
         </div>
-        <div id="learningReportMount"></div>
-
-        <div class="journal-stats" id="journalStats">
-          <div class="j-stat"><strong id="jCount">0</strong><span>分析次数</span></div>
-          <div class="j-stat"><strong id="jAvg">—</strong><span>平均分</span></div>
-          <div class="j-stat"><strong id="jBest">—</strong><span>最高分</span></div>
-          <div class="j-stat"><strong id="jWeeks">0</strong><span>完成周数</span></div>
-        </div>
-        <div class="journal-list" id="journalList">
-          <p class="journal-empty">还没有记录。上传第一张照片开始吧。</p>
-        </div>
-        <button class="btn btn-ghost" id="clearJournalBtn" type="button">清空记录</button>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div>
-      <strong>光影手帐</strong>
-      <p>
-        本地运行的摄影训练与专业构图分析工具。课程结构参考纽摄教材、Freeman、Peterson 与 B 站公开系统课。
-        照片不会上传到任何服务器。
-      </p>
+        <p class="footer-note mono">Built for deliberate practice · Not a substitute for a mentor</p>
+      </footer>
     </div>
-    <p class="footer-note mono">Built for deliberate practice · Not a substitute for a mentor</p>
-  </footer>
+  </div>
 
   <script src="data.js"></script>
   <script src="raw.js"></script>
