@@ -2465,6 +2465,31 @@ body.mode-tool [data-group="learn"] {
   font-size: 0.8rem;
 }
 
+.cull-search {
+  min-width: 130px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.cull-search:focus {
+  border-color: var(--accent);
+}
+
+.cull-check {
+  cursor: pointer;
+  user-select: none;
+}
+
+.cull-check input {
+  accent-color: var(--accent);
+}
+
 .cull-layout {
   display: grid;
   grid-template-columns: 1.35fr 0.75fr;
@@ -2601,6 +2626,19 @@ body.mode-tool [data-group="learn"] {
   max-height: 52vh;
   object-fit: contain;
   border-radius: 6px;
+}
+
+.cull-stage img.is-100 {
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+  cursor: grab;
+}
+
+.cull-stage:has(.is-100) {
+  overflow: auto;
+  place-items: start;
 }
 
 .cull-big-flag {

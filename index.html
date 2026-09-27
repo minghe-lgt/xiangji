@@ -796,7 +796,15 @@
             <option value="new">未评</option>
             <option value="pick">已入选</option>
             <option value="reject">已否决</option>
+            <option value="candidate">候选</option>
             <option value="star">仅高分</option>
+          </select>
+        </label>
+        <label class="cull-filter-label">排序
+          <select id="cullSort">
+            <option value="score">分数</option>
+            <option value="time">拍摄时间</option>
+            <option value="name">文件名</option>
           </select>
         </label>
         <label class="cull-filter-label">星 ≥
@@ -806,7 +814,13 @@
             <option>5</option>
           </select>
         </label>
+        <input class="cull-search" id="cullNameQuery" type="search" placeholder="按文件名筛选…" />
+        <label class="cull-filter-label cull-check">
+          <input type="checkbox" id="cullAutoAdvance" checked />
+          <span>标记后自动下一张</span>
+        </label>
         <span class="mono" id="cullFiltered">0 / 0</span>
+        <button class="btn btn-ghost sm" id="cullBtnUndo" type="button">撤销</button>
         <button class="btn btn-ghost sm" id="cullExportBtn" type="button">导出入选</button>
         <button class="btn btn-ghost sm" id="cullBtnReset" type="button">清空</button>
       </div>
@@ -823,17 +837,18 @@
           </div>
           <div class="cull-meta mono" id="cullMeta">—</div>
           <div class="cull-actions">
-            <button class="btn btn-ghost sm" id="cullBtnPrev" type="button">← 上一张</button>
+            <button class="btn btn-ghost sm" id="cullBtnPrev" type="button">←</button>
             <button class="btn btn-secondary sm" id="cullBtnReject" type="button">X 否决</button>
             <button class="btn btn-primary sm" id="cullBtnPick" type="button">P 入选</button>
-            <button class="btn btn-ghost sm" id="cullBtnNext" type="button">下一张 →</button>
+            <button class="btn btn-ghost sm" id="cullBtnNext" type="button">→</button>
+            <button class="btn btn-ghost sm" id="cullBtnZoom" type="button">Z 缩放</button>
+            <button class="btn btn-ghost sm cull-undo-btn" type="button">U 撤销</button>
           </div>
           <div class="cull-keys">
-            <strong>键盘</strong>
-            <span>← → 浏览</span>
-            <span>P / Enter 入选</span>
-            <span>X 删除键 否决</span>
-            <span>1–5 打星</span>
+            <strong>快捷键</strong>
+            <span>←→ / A D 翻页 · 空格/P 入选 · X 否决</span>
+            <span>1–5 星 · Z 缩放 · U / Ctrl+Z 撤销</span>
+            <span>初筛=删废片 · AI 精评=判审美</span>
           </div>
           <div class="cull-drop" id="cullDrop">
             <p>也可以把整个文件夹拖进此区域</p>
