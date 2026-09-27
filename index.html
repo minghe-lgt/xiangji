@@ -103,17 +103,26 @@
 
     <!-- Path overview -->
     <section class="section section-tight" id="path" data-group="learn">
+      <div class="section-kicker">
+        <span class="kicker-num">01</span>
+        <div>
+          <p class="eyebrow">LEARNING PATH</p>
+          <h2 class="kicker-title">六阶段路线</h2>
+        </div>
+        <p class="kicker-desc">从会按快门到会看照片。点阶段卡片进入对应周次。</p>
+      </div>
       <div class="path-strip" id="pathStrip"></div>
     </section>
 
     <!-- Training Plan -->
     <section class="section" id="plan" data-group="learn">
-      <div class="section-head">
-        <p class="eyebrow">CURRICULUM</p>
-        <h2>六阶段 · 24 周训练体系</h2>
-        <p class="section-desc">
-          每周包含「理论要点 → 拍摄任务 → 自检标准 → 推荐阅读」。点击卡片展开，完成后打勾记入进度。
-        </p>
+      <div class="section-kicker">
+        <span class="kicker-num">02</span>
+        <div>
+          <p class="eyebrow">CURRICULUM</p>
+          <h2 class="kicker-title">24 周训练体系</h2>
+        </div>
+        <p class="kicker-desc">理论 → 任务 → 自检 → 阅读。点卡片展开，勾选记进度。</p>
       </div>
 
       <div class="plan-toolbar">
@@ -216,18 +225,7 @@
 
     <!-- Photo Analysis -->
     <section class="section section-alt" id="analyze" data-group="learn">
-      <div class="section-head">
-        <p class="eyebrow">COMPOSITION LAB · PRO</p>
-        <h2>上传照片 · 专业分析</h2>
-        <p class="section-desc">
-          <strong>本地版</strong>：构图/曝光/色彩/清晰度/用光/平衡 + 直方图，离线即时。
-          <strong>AI 深度点评</strong>：大模型工作坊级细评（需厂商 Key）。可切换。
-        </p>
-        <div class="mode-switch analysis-mode" id="analysisMode" role="tablist" aria-label="分析模式">
-          <button class="mode-btn active" data-amode="local" type="button">本地分析</button>
-          <button class="mode-btn" data-amode="ai" type="button">AI 深度点评</button>
-          <button class="mode-btn" data-amode="both" type="button">两者都要</button>
-        </div>
+      <div class="section-kicker"><span class="kicker-num">03</span><div><p class="eyebrow">COMPOSITION LAB</p><h2 class="kicker-title">专业分析</h2></div><p class="kicker-desc">本地六维 + 可选 AI 深度点评，构图曝光一目了然。</p></div>
       </div>
 
       <div class="lab">
@@ -356,117 +354,128 @@
 
     <!-- Color Grading Studio -->
     <section class="section" id="grade" data-group="tool">
-      <div class="section-head">
-        <p class="eyebrow">COLOR GRADING STUDIO</p>
-        <h2>调色工作台</h2>
-        <p class="section-desc">
-          支持 ARW / CR2 / NEF / DNG 等 RAW（提取内嵌预览）与 JPEG。本地调色，或用大模型按你的意图自动出参数。
-        </p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">04</span><div><p class="eyebrow">COLOR GRADING</p><h2 class="kicker-title">调色工作台</h2></div><p class="kicker-desc">预设 / 曲线 / HSL / 分离色调，或用 AI 按意图出参。</p></div>
 
-      <div class="grade-layout">
-        <!-- 上传与预览 -->
-        <div class="grade-stage">
-          <div class="grade-drop" id="gradeDrop">
-            <input type="file" id="gradeFile" accept="image/*,.arw,.cr2,.cr3,.nef,.dng,.orf,.raf,.rw2,.pef,.srw,.raw" hidden />
-            <div class="grade-empty" id="gradeEmpty">
-              <div class="upload-icon" aria-hidden="true">
-                <svg viewBox="0 0 64 64" width="48" height="48">
-                  <rect x="6" y="12" width="52" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
-                  <path d="M12 42 L24 28 L34 36 L42 24 L52 36" fill="none" stroke="currentColor" stroke-width="2"/>
-                  <circle cx="22" cy="22" r="4" fill="currentColor"/>
-                </svg>
-              </div>
-              <p class="upload-title">拖入 RAW / 照片开始调色</p>
-              <p class="upload-sub">ARW · CR2 · NEF · DNG · JPG · PNG · WebP</p>
-              <button class="btn btn-primary" id="gradePickBtn" type="button">选择文件</button>
-            </div>
-            <div class="grade-preview hidden" id="gradePreview">
-              <div class="compare-wrap">
-                <canvas id="gradeCanvas"></canvas>
-                <div class="compare-badge" id="compareBadge">效果预览</div>
-              </div>
-              <div class="grade-meta-bar">
-                <span class="mono" id="gradeMeta">—</span>
-                <div class="grade-meta-actions">
-                  <button class="btn btn-ghost" id="toggleCompareBtn" type="button">对比原图</button>
-                  <button class="btn btn-secondary" id="exportOrigBtn" type="button">导出原图（零编码）</button>
-                  <button class="btn btn-secondary" id="exportPngBtn" type="button">导出 PNG</button>
-                  <button class="btn btn-ghost" id="exportBtn" type="button">导出 JPEG</button>
-                  <button class="btn btn-ghost" id="gradeResetFileBtn" type="button">换一张</button>
-                </div>
-              </div>
-              <p class="grade-export-note">
-                「导出原图」直接下载你载入的文件字节，不重编码。<br />
-                「导出 PNG」对当前调色结果无损；但若源是 ARW 内嵌 JPEG，相机内那一步已有损，网页无法恢复 RAW 像素。
-              </p>
-            </div>
+      <div class="grade-studio">
+        <div class="studio-bar">
+          <div class="studio-bar-left">
+            <span class="studio-tag">PRESETS</span>
+            <div class="preset-cats" id="presetCats"></div>
+          </div>
+          <div class="preset-actions">
+            <button class="btn btn-ghost sm" id="savePresetBtn" type="button">存当前</button>
+            <button class="btn btn-ghost sm" id="importPresetBtn" type="button">导入</button>
+            <button class="btn btn-ghost sm" id="exportPresetBtn" type="button">导出</button>
+            <input type="file" id="presetFile" accept=".json,application/json" hidden />
           </div>
         </div>
+        <div class="preset-strip" id="presetGrid"></div>
 
-        <!-- 控制面板 -->
-        <aside class="grade-panel">
-          <div class="gp-block">
-            <h3>风格预设</h3>
-            <div class="preset-grid" id="presetGrid"></div>
+        <div class="grade-layout">
+          <div class="grade-stage">
+            <div class="grade-drop" id="gradeDrop">
+              <input type="file" id="gradeFile" accept="image/*,.arw,.cr2,.cr3,.nef,.dng,.orf,.raf,.rw2,.pef,.srw,.raw" hidden />
+              <div class="grade-empty" id="gradeEmpty">
+                <div class="empty-art" aria-hidden="true">
+                  <div class="empty-ring"></div>
+                  <div class="empty-ring r2"></div>
+                </div>
+                <p class="upload-title">把照片拖进来</p>
+                <p class="upload-sub">ARW · CR2 · NEF · DNG · JPG · PNG · WebP</p>
+                <button class="btn btn-primary" id="gradePickBtn" type="button">选择文件</button>
+                <p class="empty-hint">支持 RAW 内嵌预览 · 本地调色不上传</p>
+              </div>
+              <div class="grade-preview hidden" id="gradePreview">
+                <div class="grade-toolbar">
+                  <span class="mono" id="gradeMeta">—</span>
+                  <div class="grade-toolbar-actions">
+                    <button class="btn btn-ghost sm" id="toggleCompareBtn" type="button">对比原图</button>
+                    <button class="btn btn-ghost sm" id="gradeResetFileBtn" type="button">换一张</button>
+                    <span class="tb-sep"></span>
+                    <button class="btn btn-ghost sm" id="exportOrigBtn" type="button">原图</button>
+                    <button class="btn btn-ghost sm" id="exportPngBtn" type="button">PNG</button>
+                    <button class="btn btn-primary sm" id="exportBtn" type="button">导出 JPEG</button>
+                  </div>
+                </div>
+                <div class="compare-wrap">
+                  <canvas id="gradeCanvas"></canvas>
+                  <div class="compare-badge" id="compareBadge">效果预览</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="gp-block">
-            <div class="gp-head">
-              <h3>手动调色</h3>
-              <button class="btn btn-ghost" id="resetGradeBtn" type="button">归零</button>
+          <aside class="grade-panel">
+            <div class="gp-tabs" id="gradeTabs">
+              <button class="gp-tab active" data-gtab="tone" type="button">影调</button>
+              <button class="gp-tab" data-gtab="color" type="button">色彩</button>
+              <button class="gp-tab" data-gtab="curve" type="button">曲线</button>
+              <button class="gp-tab" data-gtab="hsl" type="button">HSL</button>
+              <button class="gp-tab" data-gtab="split" type="button">分离</button>
+              <button class="gp-tab" data-gtab="effect" type="button">效果</button>
             </div>
-            <div class="slider-list" id="sliderList"></div>
-          </div>
 
-          <div class="gp-block ai-block">
-            <h3>AI 调色 <span class="badge">可选</span></h3>
-            <p class="gp-hint">描述你想要的效果，大模型返回调色参数（图片以缩略图发送到你配置的厂商）。</p>
-            <textarea id="aiIntent" class="ai-textarea" rows="3" placeholder="例如：日系清冷、皮肤通透、背景压暗、电影青橙…"></textarea>
-            <div class="ai-actions">
-              <button class="btn btn-primary" id="aiGradeBtn" type="button">AI 生成参数</button>
-              <button class="btn btn-secondary" id="aiToggleCfg" type="button">厂商设置</button>
+            <div class="gp-body">
+              <div class="gp-pane active" data-gpane="tone">
+                <div class="gp-pane-head">
+                  <h3>影调</h3>
+                  <button class="btn btn-ghost sm" id="resetGradeBtn" type="button">归零</button>
+                </div>
+                <div class="slider-list" data-group="tone" id="sliderTone"></div>
+              </div>
+              <div class="gp-pane" data-gpane="color">
+                <div class="gp-pane-head"><h3>色彩</h3></div>
+                <div class="slider-list" data-group="color" id="sliderColor"></div>
+              </div>
+              <div class="gp-pane" data-gpane="curve">
+                <div class="gp-pane-head"><h3>色调曲线</h3></div>
+                <div class="slider-list" data-group="curve" id="sliderCurve"></div>
+              </div>
+              <div class="gp-pane" data-gpane="hsl">
+                <div class="gp-pane-head"><h3>HSL 微调</h3></div>
+                <div class="slider-list" data-group="hsl" id="sliderHsl"></div>
+              </div>
+              <div class="gp-pane" data-gpane="split">
+                <div class="gp-pane-head"><h3>分离色调</h3></div>
+                <div class="slider-list" data-group="split" id="sliderSplit"></div>
+              </div>
+              <div class="gp-pane" data-gpane="effect">
+                <div class="gp-pane-head"><h3>效果</h3></div>
+                <div class="slider-list" data-group="effect" id="sliderEffect"></div>
+              </div>
             </div>
-            <div class="ai-config hidden" id="aiConfig">
-              <label class="cfg-row">
-                <span>厂商</span>
-                <select id="llmVendor"></select>
-              </label>
-              <label class="cfg-row">
-                <span>模型</span>
-                <input id="llmModel" type="text" placeholder="选择或输入模型名" list="llmModelList" />
-                <datalist id="llmModelList"></datalist>
-              </label>
-              <label class="cfg-row">
-                <span>Base URL</span>
-                <input id="llmBaseUrl" type="text" placeholder="https://api..." />
-              </label>
-              <label class="cfg-row">
-                <span>API Key</span>
-                <input id="llmApiKey" type="password" placeholder="仅保存在本机浏览器" />
-              </label>
-              <button class="btn btn-secondary" id="saveLlmBtn" type="button">保存配置</button>
-              <p class="cfg-note" id="llmStatus">配置只存在你的浏览器 localStorage，不会上传到本站服务器。</p>
+
+            <div class="gp-block ai-block">
+              <div class="gp-pane-head">
+                <h3>AI 调色 <span class="badge">可选</span></h3>
+                <button class="btn btn-ghost sm" id="aiToggleCfg" type="button">厂商设置</button>
+              </div>
+              <textarea id="aiIntent" class="ai-textarea" rows="2" placeholder="例如：日系清冷、皮肤通透、电影青橙…"></textarea>
+              <div class="ai-actions">
+                <button class="btn btn-primary sm" id="aiGradeBtn" type="button">AI 生成参数</button>
+              </div>
+              <div class="ai-config hidden" id="aiConfig">
+                <label class="cfg-row"><span>厂商</span><select id="llmVendor"></select></label>
+                <label class="cfg-row"><span>模型</span><input id="llmModel" type="text" placeholder="模型名" list="llmModelList" /><datalist id="llmModelList"></datalist></label>
+                <label class="cfg-row"><span>Base URL</span><input id="llmBaseUrl" type="text" placeholder="https://api..." /></label>
+                <label class="cfg-row"><span>API Key</span><input id="llmApiKey" type="password" placeholder="仅存本机" /></label>
+                <button class="btn btn-secondary sm" id="saveLlmBtn" type="button">保存配置</button>
+                <p class="cfg-note" id="llmStatus">配置只存在浏览器 localStorage。</p>
+              </div>
+              <div class="ai-result hidden" id="aiResult">
+                <h4>AI 建议</h4>
+                <p id="aiResultText">—</p>
+              </div>
             </div>
-            <div class="ai-result hidden" id="aiResult">
-              <h4>AI 建议</h4>
-              <p id="aiResultText">—</p>
-            </div>
-          </div>
-        </aside>
+          </aside>
+        </div>
       </div>
+    </section>
     </section>
 
     <!-- Photo Organizer -->
     <section class="section section-alt" id="organize" data-group="tool">
-      <div class="section-head">
-        <p class="eyebrow">LOCAL PHOTO BUTLER</p>
-        <h2>照片管家 · 本地自动归类</h2>
-        <p class="section-desc">
-          选一个本地文件夹，自动筛出今天拍的照片，按类型分文件夹、按规则重命名，再写回你指定的位置。不经过云端。
-          需要 Chrome / Edge（File System Access）。
-        </p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">06</span><div><p class="eyebrow">PHOTO BUTLER</p><h2 class="kicker-title">照片管家</h2></div><p class="kicker-desc">本地扫描、自动分类、按规则改名写回。</p></div>
 
       <div class="org-layout">
         <div class="org-main">
@@ -533,11 +542,7 @@
 
     <!-- Field Calculators -->
     <section class="section" id="tools" data-group="tool">
-      <div class="section-head">
-        <p class="eyebrow">FIELD CALCULATORS</p>
-        <h2>拍摄计算器</h2>
-        <p class="section-desc">曝光三角、景深超焦距、ND 换算、黄金时刻。离线可用。</p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">05</span><div><p class="eyebrow">FIELD CALCULATORS</p><h2 class="kicker-title">拍摄计算器</h2></div><p class="kicker-desc">曝光三角、景深、ND、黄金时刻，离线可用。</p></div>
 
       <div class="calc-tabs" id="calcTabs">
         <button class="calc-tab active" data-calc="exp" type="button">曝光三角</button>
@@ -659,11 +664,7 @@
 
     <!-- Watermark & Compare -->
     <section class="section section-alt" id="watermark" data-group="tool">
-      <div class="section-head">
-        <p class="eyebrow">BATCH WATERMARK & PICK</p>
-        <h2>水印导出 · 选片对比</h2>
-        <p class="section-desc">批量加字水印导出；或把多张摊开对比，选片打分。</p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">07</span><div><p class="eyebrow">BATCH OUTPUT</p><h2 class="kicker-title">水印 / 选片</h2></div><p class="kicker-desc">批量字水印导出，多图对比打分选片。</p></div>
 
       <div class="wm-layout">
         <div class="wm-block">
@@ -710,41 +711,25 @@
 
     <!-- Drills -->
     <section class="section" id="drills" data-group="learn">
-      <div class="section-head">
-        <p class="eyebrow">DAILY DRILLS</p>
-        <h2>日常快练</h2>
-        <p class="section-desc">10–30 分钟就能完成的小练习。不求多，只求「刻意」。</p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">08</span><div><p class="eyebrow">DAILY DRILLS</p><h2 class="kicker-title">日常快练</h2></div><p class="kicker-desc">10–30 分钟刻意练习，不求多只求准。</p></div>
       <div class="drill-grid" id="drillGrid"></div>
     </section>
 
     <!-- Library -->
     <section class="section section-alt" id="library" data-group="learn">
-      <div class="section-head">
-        <p class="eyebrow">READING & COURSES</p>
-        <h2>书单与课单</h2>
-        <p class="section-desc">整合经典教材与 B 站系统课。先打地基，再谈风格。</p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">09</span><div><p class="eyebrow">READING</p><h2 class="kicker-title">书单课单</h2></div><p class="kicker-desc">经典教材与系统课，先地基后风格。</p></div>
       <div class="library-list" id="libraryList"></div>
     </section>
 
     <!-- Cheat sheet -->
     <section class="section" id="cheatsheet" data-group="learn">
-      <div class="section-head">
-        <p class="eyebrow">FIELD NOTES</p>
-        <h2>构图速查 · 9 条</h2>
-        <p class="section-desc">拍摄前扫一眼，现场就能用。</p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">10</span><div><p class="eyebrow">FIELD NOTES</p><h2 class="kicker-title">构图速查</h2></div><p class="kicker-desc">现场扫一眼就能用的九条法则。</p></div>
       <div class="cheat-grid" id="cheatGrid"></div>
     </section>
 
     <!-- Progress -->
     <section class="section section-alt" id="progress" data-group="learn">
-      <div class="section-head">
-        <p class="eyebrow">JOURNAL</p>
-        <h2>我的练习记录</h2>
-        <p class="section-desc">分析历史保存在本地，方便回顾进步轨迹。</p>
-      </div>
+      <div class="section-kicker"><span class="kicker-num">11</span><div><p class="eyebrow">JOURNAL</p><h2 class="kicker-title">学习记录</h2></div><p class="kicker-desc">进度、作品与学习报告都在这里。</p></div>
       <div class="journal">
         <div class="report-export-bar">
           <button class="btn btn-primary" id="genReportBtn" type="button">生成学习报告</button>

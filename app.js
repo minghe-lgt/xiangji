@@ -37,9 +37,9 @@ function renderPath() {
     const pct = Math.round((done / st.weeks.length) * 100);
     return `
       <div class="path-item" data-stage="${st.id}">
-        <div class="num">STAGE ${idx + 1}</div>
+        <div class="num">${String(idx + 1).padStart(2, "0")}</div>
         <div class="name">${st.name}</div>
-        <div class="sub">${st.subtitle}</div>
+        <span class="sub">${st.subtitle}</span>
         <div class="bar"><i style="width:${pct}%"></i></div>
       </div>
     `;
@@ -565,30 +565,39 @@ function setupUpload() {
 
 /* ========== Color Grading Studio ========== */
 const GRADE_SLIDERS = [
-  { key: "exposure", name: "曝光", min: -200, max: 200, scale: 100 },
-  { key: "contrast", name: "对比度", min: -100, max: 100, scale: 1 },
-  { key: "highlights", name: "高光", min: -100, max: 100, scale: 1 },
-  { key: "shadows", name: "阴影", min: -100, max: 100, scale: 1 },
-  { key: "whites", name: "白色", min: -100, max: 100, scale: 1 },
-  { key: "blacks", name: "黑色", min: -100, max: 100, scale: 1 },
-  { key: "temp", name: "色温", min: -100, max: 100, scale: 1 },
-  { key: "tint", name: "色调", min: -100, max: 100, scale: 1 },
-  { key: "vibrance", name: "自然饱和", min: -100, max: 100, scale: 1 },
-  { key: "saturation", name: "饱和度", min: -100, max: 100, scale: 1 },
-  { key: "clarity", name: "清晰度", min: -100, max: 100, scale: 1 },
-  { key: "fade", name: "褪色", min: 0, max: 100, scale: 1 },
-  { key: "vignette", name: "暗角", min: 0, max: 100, scale: 1 },
-  { key: "curveShadows", name: "曲线·暗部", min: -100, max: 100, scale: 1 },
-  { key: "curveMids", name: "曲线·中间", min: -100, max: 100, scale: 1 },
-  { key: "curveHighlights", name: "曲线·高光", min: -100, max: 100, scale: 1 },
-  { key: "hueOrange", name: "HSL·橙", min: -100, max: 100, scale: 1 },
-  { key: "satOrange", name: "HSL·橙饱", min: -100, max: 100, scale: 1 },
-  { key: "hueBlue", name: "HSL·蓝", min: -100, max: 100, scale: 1 },
-  { key: "satBlue", name: "HSL·蓝饱", min: -100, max: 100, scale: 1 },
-  { key: "splitStrength", name: "分离色调", min: 0, max: 100, scale: 1 },
-  { key: "splitHue", name: "高光色相", min: 0, max: 360, scale: 1 },
-  { key: "splitHueShadow", name: "阴影色相", min: 0, max: 360, scale: 1 },
+  { key: "exposure", name: "曝光", min: -200, max: 200, scale: 100, group: "tone" },
+  { key: "contrast", name: "对比度", min: -100, max: 100, scale: 1, group: "tone" },
+  { key: "highlights", name: "高光", min: -100, max: 100, scale: 1, group: "tone" },
+  { key: "shadows", name: "阴影", min: -100, max: 100, scale: 1, group: "tone" },
+  { key: "whites", name: "白色", min: -100, max: 100, scale: 1, group: "tone" },
+  { key: "blacks", name: "黑色", min: -100, max: 100, scale: 1, group: "tone" },
+  { key: "temp", name: "色温", min: -100, max: 100, scale: 1, group: "color" },
+  { key: "tint", name: "色调", min: -100, max: 100, scale: 1, group: "color" },
+  { key: "vibrance", name: "自然饱和", min: -100, max: 100, scale: 1, group: "color" },
+  { key: "saturation", name: "饱和度", min: -100, max: 100, scale: 1, group: "color" },
+  { key: "curveShadows", name: "暗部", min: -100, max: 100, scale: 1, group: "curve" },
+  { key: "curveMids", name: "中间调", min: -100, max: 100, scale: 1, group: "curve" },
+  { key: "curveHighlights", name: "高光", min: -100, max: 100, scale: 1, group: "curve" },
+  { key: "hueOrange", name: "橙·色相", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "satOrange", name: "橙·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "hueBlue", name: "蓝·色相", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "satBlue", name: "蓝·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "splitStrength", name: "强度", min: 0, max: 100, scale: 1, group: "split" },
+  { key: "splitHue", name: "高光色相", min: 0, max: 360, scale: 1, group: "split" },
+  { key: "splitHueShadow", name: "阴影色相", min: 0, max: 360, scale: 1, group: "split" },
+  { key: "clarity", name: "清晰度", min: -100, max: 100, scale: 1, group: "effect" },
+  { key: "fade", name: "褪色", min: 0, max: 100, scale: 1, group: "effect" },
+  { key: "vignette", name: "暗角", min: 0, max: 100, scale: 1, group: "effect" },
 ];
+
+const GRADE_GROUP_IDS = {
+  tone: "#sliderTone",
+  color: "#sliderColor",
+  curve: "#sliderCurve",
+  hsl: "#sliderHsl",
+  split: "#sliderSplit",
+  effect: "#sliderEffect",
+};
 
 let gradeState = {
   sourceCanvas: null,
@@ -608,14 +617,56 @@ function setupGrade() {
   const gradeCanvas = $("#gradeCanvas");
 
   // presets
-  $("#presetGrid").innerHTML = GRADE_PRESETS.map(
-    (p) => `
-    <button class="preset-btn" type="button" data-preset="${p.id}">
+  let activeCat = "全部";
+
+  function allPresets() {
+    return [...GRADE_PRESETS, ...loadUserPresets()];
+  }
+
+  function renderPresetCats() {
+    const cats = ["全部", "基础", "胶片", "电影", "人像", "黑白", "风格", "我的"];
+    $("#presetCats").innerHTML = cats
+      .map(
+        (c) =>
+          `<button type="button" class="preset-cat ${c === activeCat ? "active" : ""}" data-cat="${c}">${c}</button>`
+      )
+      .join("");
+  }
+
+  function renderPresets() {
+    const list = allPresets().filter((p) => activeCat === "全部" || p.cat === activeCat || (activeCat === "我的" && p.cat === "我的"));
+    $("#presetGrid").innerHTML = list
+      .map((p) => {
+        // 用 temp / saturation 生成小色条，直观一点
+        let bar = "background:linear-gradient(90deg,#8a8078,#c4b8a8)";
+        if (p.params && p.params !== "AUTO") {
+          const t = (p.params.temp || 0) / 100;
+          const s = (p.params.saturation || 0) / 100;
+          const w = p.params.temp != null ? p.params.temp : 0;
+          const c1 = w >= 0 ? "#d4a054" : "#6a9ec4";
+          const c2 = w >= 0 ? "#e8c88a" : "#8ec0dc";
+          bar = `background:linear-gradient(90deg,${c1},${c2});opacity:${0.45 + Math.min(0.55, Math.abs(s) + 0.2)}`;
+        }
+        return `
+    <button class="preset-btn ${gradeState.activePreset === p.id ? "active" : ""}" type="button" data-preset="${p.id}" title="${(p.desc || "").replace(/"/g, "")}">
+      <i class="preset-swatch" style="${bar}"></i>
       <strong>${p.name}</strong>
-      <span>${p.desc}</span>
     </button>
-  `
-  ).join("");
+  `;
+      })
+      .join("");
+  }
+
+  renderPresetCats();
+  renderPresets();
+
+  $("#presetCats")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-cat]");
+    if (!btn) return;
+    activeCat = btn.dataset.cat;
+    renderPresetCats();
+    renderPresets();
+  });
 
   $("#presetGrid").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-preset]");
@@ -623,27 +674,71 @@ function setupGrade() {
       if (btn && !gradeState.sourceCanvas) alert("请先载入一张照片");
       return;
     }
-    const preset = GRADE_PRESETS.find((p) => p.id === btn.dataset.preset);
+    const preset = allPresets().find((p) => p.id === btn.dataset.preset);
     if (!preset) return;
 
     if (preset.params === "AUTO") {
       const meta = estimateMetaFromCanvas(gradeState.sourceCanvas);
       gradeState.params = autoGradeFromHistogram(null, meta);
     } else {
-      gradeState.params = { ...preset.params };
+      gradeState.params = { ...DEFAULT_GRADE, ...preset.params };
     }
     gradeState.activePreset = preset.id;
     gradeState.showingOriginal = false;
     renderSliders();
     repaintGrade();
-    $$("#presetGrid .preset-btn").forEach((el) => {
-      el.classList.toggle("active", el.dataset.preset === preset.id);
-    });
+    renderPresets();
+  });
+
+  // save / import / export presets
+  $("#savePresetBtn")?.addEventListener("click", () => {
+    const name = prompt("预设名称（最多 16 字）", "我的预设");
+    if (!name) return;
+    const item = saveUserPreset(name, gradeState.params);
+    activeCat = "我的";
+    renderPresetCats();
+    renderPresets();
+    gradeState.activePreset = item.id;
+    renderPresets();
+    alert(`已保存「${item.name}」到「我的」预设。`);
+  });
+
+  $("#importPresetBtn")?.addEventListener("click", () => {
+    $("#presetFile").click();
+  });
+
+  $("#presetFile")?.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const obj = JSON.parse(text);
+      const item = importPresetJSON(obj);
+      activeCat = "我的";
+      renderPresetCats();
+      renderPresets();
+      alert(`已导入「${item.name}」`);
+    } catch (err) {
+      alert("导入失败：" + (err.message || err));
+    }
+    e.target.value = "";
+  });
+
+  $("#exportPresetBtn")?.addEventListener("click", () => {
+    const current = {
+      name: "光影手帐预设-" + new Date().toISOString().slice(0, 10),
+      desc: "自定义调色参数",
+      params: gradeState.params,
+    };
+    const json = exportPresetJSON(current);
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
+    downloadBlob(blob, `preset-${Date.now()}.json`);
   });
 
   // sliders
   renderSliders();
   bindSliders();
+  bindGradeTabs();
   $("#resetGradeBtn").addEventListener("click", () => {
     gradeState.params = { ...DEFAULT_GRADE };
     gradeState.activePreset = null;
@@ -878,10 +973,11 @@ function estimateMetaFromCanvas(canvas) {
 }
 
 function renderSliders() {
-  $("#sliderList").innerHTML = GRADE_SLIDERS.map((s) => {
+  const htmlByGroup = {};
+  for (const s of GRADE_SLIDERS) {
     const raw = gradeState.params[s.key];
     const val = Math.round(raw * s.scale);
-    return `
+    const row = `
       <div class="slider-row">
         <label for="sl-${s.key}">${s.name}</label>
         <input type="range" id="sl-${s.key}" data-key="${s.key}" data-scale="${s.scale}"
@@ -889,11 +985,33 @@ function renderSliders() {
         <span class="val" id="val-${s.key}">${(raw).toFixed(s.scale > 1 ? 2 : 0)}</span>
       </div>
     `;
-  }).join("");
+    const g = s.group || "tone";
+    if (!htmlByGroup[g]) htmlByGroup[g] = "";
+    htmlByGroup[g] += row;
+  }
+  for (const [g, sel] of Object.entries(GRADE_GROUP_IDS)) {
+    const el = $(sel);
+    if (el) el.innerHTML = htmlByGroup[g] || "";
+  }
+}
+
+function bindGradeTabs() {
+  const box = $("#gradeTabs");
+  if (!box) return;
+  box.addEventListener("click", (e) => {
+    const tab = e.target.closest("[data-gtab]");
+    if (!tab) return;
+    $$("#gradeTabs .gp-tab").forEach((t) => t.classList.toggle("active", t === tab));
+    $$(".gp-pane").forEach((p) => {
+      p.classList.toggle("active", p.dataset.gpane === tab.dataset.gtab);
+    });
+  });
 }
 
 function bindSliders() {
-  $("#sliderList").addEventListener("input", (e) => {
+  const body = $(".gp-body");
+  if (!body) return;
+  body.addEventListener("input", (e) => {
     const input = e.target.closest("[data-key]");
     if (!input) return;
     const key = input.dataset.key;
