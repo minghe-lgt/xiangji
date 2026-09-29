@@ -624,7 +624,12 @@ function setupGrade() {
   }
 
   function renderPresetCats() {
-    const cats = ["全部", "基础", "胶片", "电影", "人像", "黑白", "风格", "我的"];
+    const all = allPresets();
+    const set = new Set();
+    all.forEach((p) => {
+      if (p.cat) set.add(p.cat);
+    });
+    const cats = ["全部", ...[...set], "我的"];
     $("#presetCats").innerHTML = cats
       .map(
         (c) =>

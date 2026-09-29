@@ -44,13 +44,13 @@ const GRADE_PRESETS = [
   { id: "matte", name: "哑光质感", cat: "基础", desc: "压白提黑、低对比", params: { ...DEFAULT_GRADE, contrast: -18, highlights: -24, shadows: 16, whites: -20, blacks: 28, saturation: -8, fade: 18 } },
 
   // —— 胶片 ——
-  { id: "portra400", name: "Portra 400", cat: "胶片", desc: "人像暖肤、奶油高光", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: 4, highlights: -18, shadows: 16, temp: 16, tint: 8, vibrance: 10, saturation: -4, clarity: -8, fade: 8 } },
-  { id: "portra800", name: "Portra 800", cat: "胶片", desc: "更暖、颗粒感、街头人像", params: { ...DEFAULT_GRADE, exposure: 0.1, contrast: 8, highlights: -16, shadows: 14, temp: 20, tint: 6, vibrance: 12, saturation: -2, fade: 12, vignette: 10 } },
-  { id: "fuji400h", name: "Fuji 400H", cat: "胶片", desc: "青绿调、清新胶片", params: { ...DEFAULT_GRADE, exposure: 0.15, contrast: -6, highlights: -12, shadows: 18, temp: -10, tint: -8, vibrance: 8, saturation: -10, fade: 10 } },
-  { id: "superia", name: "Superia 400", cat: "胶片", desc: "青色偏移、日系日常", params: { ...DEFAULT_GRADE, contrast: 6, highlights: -12, shadows: 10, temp: -8, tint: -6, vibrance: 14, saturation: -4, fade: 8 } },
-  { id: "cinestill", name: "CineStill 800T", cat: "胶片", desc: "钨丝灯青调、夜景霓虹", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 12, highlights: -20, shadows: -6, temp: -28, tint: 8, vibrance: 18, saturation: -2, clarity: 8, vignette: 14 } },
-  { id: "trix", name: "Tri-X 400", cat: "胶片", desc: "高反差黑白、纪实", params: { ...DEFAULT_GRADE, exposure: 0.05, contrast: 22, highlights: -14, shadows: -8, clarity: 16, saturation: -100, fade: 8, vignette: 12 } },
-  { id: "hp5", name: "Ilford HP5", cat: "胶片", desc: "柔和黑白、灰阶丰富", params: { ...DEFAULT_GRADE, contrast: 10, highlights: -10, shadows: 12, blacks: 8, clarity: 6, saturation: -100, fade: 12 } },
+  { id: "portra400", name: "人像 Portra 400", cat: "胶片", desc: "人像暖肤、奶油高光", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: 4, highlights: -18, shadows: 16, temp: 16, tint: 8, vibrance: 10, saturation: -4, clarity: -8, fade: 8 } },
+  { id: "portra800", name: "人像 Portra 800", cat: "胶片", desc: "更暖、颗粒感、街头人像", params: { ...DEFAULT_GRADE, exposure: 0.1, contrast: 8, highlights: -16, shadows: 14, temp: 20, tint: 6, vibrance: 12, saturation: -2, fade: 12, vignette: 10 } },
+  { id: "fuji400h", name: "富士 400H", cat: "胶片", desc: "青绿调、清新胶片", params: { ...DEFAULT_GRADE, exposure: 0.15, contrast: -6, highlights: -12, shadows: 18, temp: -10, tint: -8, vibrance: 8, saturation: -10, fade: 10 } },
+  { id: "superia", name: "富士 Superia 400", cat: "胶片", desc: "青色偏移、日系日常", params: { ...DEFAULT_GRADE, contrast: 6, highlights: -12, shadows: 10, temp: -8, tint: -6, vibrance: 14, saturation: -4, fade: 8 } },
+  { id: "cinestill", name: "CineStill 800T 钨丝", cat: "胶片", desc: "钨丝灯青调、夜景霓虹", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 12, highlights: -20, shadows: -6, temp: -28, tint: 8, vibrance: 18, saturation: -2, clarity: 8, vignette: 14 } },
+  { id: "trix", name: "Tri-X 400 高反差", cat: "胶片", desc: "高反差黑白、纪实", params: { ...DEFAULT_GRADE, exposure: 0.05, contrast: 22, highlights: -14, shadows: -8, clarity: 16, saturation: -100, fade: 8, vignette: 12 } },
+  { id: "hp5", name: "Ilford HP5 柔调", cat: "胶片", desc: "柔和黑白、灰阶丰富", params: { ...DEFAULT_GRADE, contrast: 10, highlights: -10, shadows: 12, blacks: 8, clarity: 6, saturation: -100, fade: 12 } },
   { id: "polaroid", name: "拍立得", cat: "胶片", desc: "褪色、粉调、梦幻", params: { ...DEFAULT_GRADE, exposure: 0.18, contrast: -12, highlights: -20, shadows: 22, temp: 12, tint: 14, vibrance: -4, saturation: -14, fade: 28, vignette: 16 } },
   { id: "filmclassic", name: "经典褪色", cat: "胶片", desc: "老电影、抬黑压白", params: { ...DEFAULT_GRADE, contrast: -8, highlights: -16, shadows: 20, whites: -14, blacks: 22, saturation: -12, vibrance: 6, fade: 24, vignette: 10 } },
 
