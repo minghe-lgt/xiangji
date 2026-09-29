@@ -29,6 +29,9 @@ const DEFAULT_GRADE = {
   splitHue: 0,      // 高光色相 0-360（用 0 表示关闭）
   splitHueShadow: 0,
   splitStrength: 0, // 0-100
+  // 胶片质感
+  grain: 0,         // 0-100 颗粒
+  halation: 0,      // 0-100 高光光晕
 };
 
 /** 风格预设 */
@@ -44,38 +47,38 @@ const GRADE_PRESETS = [
   { id: "matte", name: "哑光质感", cat: "基础", desc: "压白提黑、低对比", params: { ...DEFAULT_GRADE, contrast: -18, highlights: -24, shadows: 16, whites: -20, blacks: 28, saturation: -8, fade: 18 } },
 
   // —— 胶片 ——
-  { id: "portra400", name: "人像 Portra 400", cat: "胶片", desc: "人像暖肤、奶油高光", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: 4, highlights: -18, shadows: 16, temp: 16, tint: 8, vibrance: 10, saturation: -4, clarity: -8, fade: 8 } },
-  { id: "portra800", name: "人像 Portra 800", cat: "胶片", desc: "更暖、颗粒感、街头人像", params: { ...DEFAULT_GRADE, exposure: 0.1, contrast: 8, highlights: -16, shadows: 14, temp: 20, tint: 6, vibrance: 12, saturation: -2, fade: 12, vignette: 10 } },
-  { id: "fuji400h", name: "富士 400H", cat: "胶片", desc: "青绿调、清新胶片", params: { ...DEFAULT_GRADE, exposure: 0.15, contrast: -6, highlights: -12, shadows: 18, temp: -10, tint: -8, vibrance: 8, saturation: -10, fade: 10 } },
-  { id: "superia", name: "富士 Superia 400", cat: "胶片", desc: "青色偏移、日系日常", params: { ...DEFAULT_GRADE, contrast: 6, highlights: -12, shadows: 10, temp: -8, tint: -6, vibrance: 14, saturation: -4, fade: 8 } },
-  { id: "cinestill", name: "CineStill 800T 钨丝", cat: "胶片", desc: "钨丝灯青调、夜景霓虹", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 12, highlights: -20, shadows: -6, temp: -28, tint: 8, vibrance: 18, saturation: -2, clarity: 8, vignette: 14 } },
-  { id: "trix", name: "Tri-X 400 高反差", cat: "胶片", desc: "高反差黑白、纪实", params: { ...DEFAULT_GRADE, exposure: 0.05, contrast: 22, highlights: -14, shadows: -8, clarity: 16, saturation: -100, fade: 8, vignette: 12 } },
-  { id: "hp5", name: "Ilford HP5 柔调", cat: "胶片", desc: "柔和黑白、灰阶丰富", params: { ...DEFAULT_GRADE, contrast: 10, highlights: -10, shadows: 12, blacks: 8, clarity: 6, saturation: -100, fade: 12 } },
-  { id: "polaroid", name: "拍立得", cat: "胶片", desc: "褪色、粉调、梦幻", params: { ...DEFAULT_GRADE, exposure: 0.18, contrast: -12, highlights: -20, shadows: 22, temp: 12, tint: 14, vibrance: -4, saturation: -14, fade: 28, vignette: 16 } },
-  { id: "filmclassic", name: "经典褪色", cat: "胶片", desc: "老电影、抬黑压白", params: { ...DEFAULT_GRADE, contrast: -8, highlights: -16, shadows: 20, whites: -14, blacks: 22, saturation: -12, vibrance: 6, fade: 24, vignette: 10 } },
+  { id: "portra400", name: "人像 Portra 400", cat: "胶片", desc: "人像暖肤、奶油高光", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: 4, highlights: -18, shadows: 16, temp: 16, tint: 8, vibrance: 10, saturation: -4, clarity: -8, fade: 8 , grain: 16, halation: 10} },
+  { id: "portra800", name: "人像 Portra 800", cat: "胶片", desc: "更暖、颗粒感、街头人像", params: { ...DEFAULT_GRADE, exposure: 0.1, contrast: 8, highlights: -16, shadows: 14, temp: 20, tint: 6, vibrance: 12, saturation: -2, fade: 12, vignette: 10 , grain: 22, halation: 12} },
+  { id: "fuji400h", name: "富士 400H", cat: "胶片", desc: "青绿调、清新胶片", params: { ...DEFAULT_GRADE, exposure: 0.15, contrast: -6, highlights: -12, shadows: 18, temp: -10, tint: -8, vibrance: 8, saturation: -10, fade: 10 , grain: 12, halation: 8} },
+  { id: "superia", name: "富士 Superia 400", cat: "胶片", desc: "青色偏移、日系日常", params: { ...DEFAULT_GRADE, contrast: 6, highlights: -12, shadows: 10, temp: -8, tint: -6, vibrance: 14, saturation: -4, fade: 8 , grain: 14, halation: 8} },
+  { id: "cinestill", name: "CineStill 800T 钨丝", cat: "胶片", desc: "钨丝灯青调、夜景霓虹", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 12, highlights: -20, shadows: -6, temp: -28, tint: 8, vibrance: 18, saturation: -2, clarity: 8, vignette: 14 , grain: 26, halation: 52} },
+  { id: "trix", name: "Tri-X 400 高反差", cat: "胶片", desc: "高反差黑白、纪实", params: { ...DEFAULT_GRADE, exposure: 0.05, contrast: 22, highlights: -14, shadows: -8, clarity: 16, saturation: -100, fade: 8, vignette: 12 , grain: 30, halation: 6} },
+  { id: "hp5", name: "Ilford HP5 柔调", cat: "胶片", desc: "柔和黑白、灰阶丰富", params: { ...DEFAULT_GRADE, contrast: 10, highlights: -10, shadows: 12, blacks: 8, clarity: 6, saturation: -100, fade: 12 , grain: 18, halation: 5} },
+  { id: "polaroid", name: "拍立得", cat: "胶片", desc: "褪色、粉调、梦幻", params: { ...DEFAULT_GRADE, exposure: 0.18, contrast: -12, highlights: -20, shadows: 22, temp: 12, tint: 14, vibrance: -4, saturation: -14, fade: 28, vignette: 16 , grain: 20, halation: 18} },
+  { id: "filmclassic", name: "经典褪色", cat: "胶片", desc: "老电影、抬黑压白", params: { ...DEFAULT_GRADE, contrast: -8, highlights: -16, shadows: 20, whites: -14, blacks: 22, saturation: -12, vibrance: 6, fade: 24, vignette: 10 , grain: 16, halation: 10} },
 
   // —— 电影 ——
-  { id: "tealorange", name: "青橙大片", cat: "电影", desc: "好莱坞 Teal & Orange", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 18, highlights: -24, shadows: -6, temp: -6, tint: 6, vibrance: 16, saturation: -2, clarity: 10, hueBlue: 24, hueOrange: -10, vignette: 18, splitStrength: 30, splitHue: 40, splitHueShadow: 200 } },
-  { id: "bladerunner", name: "银翼杀手", cat: "电影", desc: "赛博青紫、高对比", params: { ...DEFAULT_GRADE, exposure: -0.12, contrast: 22, highlights: -18, shadows: -12, temp: -22, tint: 16, vibrance: 14, saturation: -6, clarity: 12, vignette: 22, splitStrength: 36, splitHue: 220, splitHueShadow: 280 } },
+  { id: "tealorange", name: "青橙大片", cat: "电影", desc: "好莱坞 Teal & Orange", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 18, highlights: -24, shadows: -6, temp: -6, tint: 6, vibrance: 16, saturation: -2, clarity: 10, hueBlue: 24, hueOrange: -10, vignette: 18, splitStrength: 30, splitHue: 40, splitHueShadow: 200 , grain: 8, halation: 12} },
+  { id: "bladerunner", name: "银翼杀手", cat: "电影", desc: "赛博青紫、高对比", params: { ...DEFAULT_GRADE, exposure: -0.12, contrast: 22, highlights: -18, shadows: -12, temp: -22, tint: 16, vibrance: 14, saturation: -6, clarity: 12, vignette: 22, splitStrength: 36, splitHue: 220, splitHueShadow: 280 , grain: 12, halation: 22} },
   { id: "wes", name: "韦斯·安德森", cat: "电影", desc: "对称粉黄、复古糖果色", params: { ...DEFAULT_GRADE, exposure: 0.1, contrast: 8, highlights: -12, shadows: 12, temp: 18, tint: 12, vibrance: 16, saturation: 6, fade: 10, splitStrength: 18, splitHue: 50, splitHueShadow: 320 } },
-  { id: "noir", name: "黑色电影", cat: "电影", desc: "低调、硬光、戏剧", params: { ...DEFAULT_GRADE, exposure: -0.18, contrast: 28, highlights: -20, shadows: -16, whites: 10, blacks: -10, clarity: 18, saturation: -100, vignette: 28 } },
-  { id: "moonlight", name: "月光蓝调", cat: "电影", desc: "忧郁蓝、低饱和", params: { ...DEFAULT_GRADE, exposure: -0.1, contrast: 14, highlights: -16, shadows: -8, temp: -30, tint: 8, vibrance: -6, saturation: -16, fade: 14, vignette: 16, splitStrength: 24, splitHueShadow: 210 } },
-  { id: "golden", name: "黄金时刻", cat: "电影", desc: "暖金、柔高光", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: 10, highlights: -18, shadows: 14, temp: 24, tint: 6, vibrance: 14, saturation: 4, clarity: 4, fade: 6, splitStrength: 20, splitHue: 45 } },
+  { id: "noir", name: "黑色电影", cat: "电影", desc: "低调、硬光、戏剧", params: { ...DEFAULT_GRADE, exposure: -0.18, contrast: 28, highlights: -20, shadows: -16, whites: 10, blacks: -10, clarity: 18, saturation: -100, vignette: 28 , grain: 16, halation: 4} },
+  { id: "moonlight", name: "月光蓝调", cat: "电影", desc: "忧郁蓝、低饱和", params: { ...DEFAULT_GRADE, exposure: -0.1, contrast: 14, highlights: -16, shadows: -8, temp: -30, tint: 8, vibrance: -6, saturation: -16, fade: 14, vignette: 16, splitStrength: 24, splitHueShadow: 210 , grain: 14, halation: 18} },
+  { id: "golden", name: "黄金时刻", cat: "电影", desc: "暖金、柔高光", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: 10, highlights: -18, shadows: 14, temp: 24, tint: 6, vibrance: 14, saturation: 4, clarity: 4, fade: 6, splitStrength: 20, splitHue: 45 , grain: 10, halation: 16} },
 
   // —— 日系 / 人像 ——
   { id: "japan", name: "日系清冷", cat: "人像", desc: "高调、偏冷、低对比", params: { ...DEFAULT_GRADE, exposure: 0.25, contrast: -14, highlights: -12, shadows: 24, temp: -18, tint: -4, vibrance: 6, saturation: -12, fade: 12 } },
-  { id: "japanwarm", name: "日系暖调", cat: "人像", desc: "胶片暖、奶油肌", params: { ...DEFAULT_GRADE, exposure: 0.18, contrast: -6, highlights: -16, shadows: 18, temp: 14, tint: 6, vibrance: 8, saturation: -8, clarity: -6, fade: 10 } },
+  { id: "japanwarm", name: "日系暖调", cat: "人像", desc: "胶片暖、奶油肌", params: { ...DEFAULT_GRADE, exposure: 0.18, contrast: -6, highlights: -16, shadows: 18, temp: 14, tint: 6, vibrance: 8, saturation: -8, clarity: -6, fade: 10 , grain: 12, halation: 8} },
   { id: "skin", name: "人像暖肤", cat: "人像", desc: "偏暖、柔对比、通透", params: { ...DEFAULT_GRADE, exposure: 0.15, contrast: 8, highlights: -20, shadows: 18, temp: 18, tint: 6, vibrance: 12, clarity: -6, fade: 6 } },
   { id: "candy", name: "糖果少女", cat: "人像", desc: "粉紫、高明度", params: { ...DEFAULT_GRADE, exposure: 0.22, contrast: -8, highlights: -14, shadows: 20, temp: 8, tint: 20, vibrance: 14, saturation: -2, fade: 12, splitStrength: 16, splitHue: 320 } },
   { id: "mori", name: "森系自然", cat: "人像", desc: "绿调、柔和", params: { ...DEFAULT_GRADE, exposure: 0.12, contrast: -4, highlights: -14, shadows: 16, temp: -6, tint: -12, vibrance: 10, saturation: -6, fade: 8, splitStrength: 14, splitHueShadow: 120 } },
 
   // —— 黑白 / 风格 ——
-  { id: "bw", name: "经典黑白", cat: "黑白", desc: "高反差银盐", params: { ...DEFAULT_GRADE, contrast: 24, highlights: -16, shadows: -6, clarity: 18, saturation: -100, vignette: 16 } },
-  { id: "bwsoft", name: "柔和黑白", cat: "黑白", desc: "灰阶、肖像", params: { ...DEFAULT_GRADE, contrast: 8, highlights: -12, shadows: 14, clarity: 4, saturation: -100, fade: 10 } },
-  { id: "bwhyper", name: "高反差黑白", cat: "黑白", desc: "街头、硬光", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 36, highlights: -10, shadows: -18, clarity: 24, saturation: -100, vignette: 22 } },
+  { id: "bw", name: "经典黑白", cat: "黑白", desc: "高反差银盐", params: { ...DEFAULT_GRADE, contrast: 24, highlights: -16, shadows: -6, clarity: 18, saturation: -100, vignette: 16 , grain: 14, halation: 4} },
+  { id: "bwsoft", name: "柔和黑白", cat: "黑白", desc: "灰阶、肖像", params: { ...DEFAULT_GRADE, contrast: 8, highlights: -12, shadows: 14, clarity: 4, saturation: -100, fade: 10 , grain: 12, halation: 3} },
+  { id: "bwhyper", name: "高反差黑白", cat: "黑白", desc: "街头、硬光", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 36, highlights: -10, shadows: -18, clarity: 24, saturation: -100, vignette: 22 , grain: 20, halation: 4} },
   { id: "crush", name: "浓墨重彩", cat: "风格", desc: "高对比、高饱和", params: { ...DEFAULT_GRADE, exposure: -0.05, contrast: 24, highlights: -18, shadows: -8, vibrance: 22, saturation: 12, clarity: 16, vignette: 14 } },
-  { id: "fadeout", name: "褪色怀旧", cat: "风格", desc: "胶片褪色、低反差", params: { ...DEFAULT_GRADE, contrast: -16, highlights: -22, shadows: 20, whites: -18, blacks: 26, saturation: -16, fade: 30, vignette: 12 } },
-  { id: "coldfilm", name: "冷调电影", cat: "风格", desc: "清冷、克制", params: { ...DEFAULT_GRADE, exposure: -0.04, contrast: 12, highlights: -16, shadows: -4, temp: -18, tint: 4, vibrance: -4, saturation: -12, clarity: 8, vignette: 12 } },
+  { id: "fadeout", name: "褪色怀旧", cat: "风格", desc: "胶片褪色、低反差", params: { ...DEFAULT_GRADE, contrast: -16, highlights: -22, shadows: 20, whites: -18, blacks: 26, saturation: -16, fade: 30, vignette: 12 , grain: 22, halation: 8} },
+  { id: "coldfilm", name: "冷调电影", cat: "风格", desc: "清冷、克制", params: { ...DEFAULT_GRADE, exposure: -0.04, contrast: 12, highlights: -16, shadows: -4, temp: -18, tint: 4, vibrance: -4, saturation: -12, clarity: 8, vignette: 12 , grain: 12, halation: 10} },
 ];
 
 /** 用户自定义预设（localStorage） */
@@ -355,6 +358,81 @@ function applyGrade(srcCanvas, params) {
         d[i + 1] *= v;
         d[i + 2] *= v;
       }
+    }
+  }
+
+  // 光晕 Halation：高光外圈暖红（CineStill 类）
+  if (p.halation > 0) {
+    const amt = p.halation / 100;
+    const sw = Math.max(8, w >> 2);
+    const sh = Math.max(8, h >> 2);
+    const mask = new Float32Array(sw * sh);
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const sx = Math.min(w - 1, (x * w) / sw | 0);
+        const sy = Math.min(h - 1, (y * h) / sh | 0);
+        const i = (sy * w + sx) * 4;
+        const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        mask[y * sw + x] = L > 200 ? (L - 200) / 55 : 0;
+      }
+    }
+    // 可分离盒模糊 ×2
+    const blur = (arr, ww, hh, r) => {
+      const tmp = new Float32Array(arr.length);
+      for (let y = 0; y < hh; y++) {
+        for (let x = 0; x < ww; x++) {
+          let s = 0, n = 0;
+          for (let k = -r; k <= r; k++) {
+            const xx = x + k;
+            if (xx < 0 || xx >= ww) continue;
+            s += arr[y * ww + xx];
+            n++;
+          }
+          tmp[y * ww + x] = s / Math.max(1, n);
+        }
+      }
+      for (let x = 0; x < ww; x++) {
+        for (let y = 0; y < hh; y++) {
+          let s = 0, n = 0;
+          for (let k = -r; k <= r; k++) {
+            const yy = y + k;
+            if (yy < 0 || yy >= hh) continue;
+            s += tmp[yy * ww + x];
+            n++;
+          }
+          arr[y * ww + x] = s / Math.max(1, n);
+        }
+      }
+    };
+    const r = Math.max(2, (Math.min(sw, sh) / 18) | 0);
+    blur(mask, sw, sh, r);
+    blur(mask, sw, sh, r);
+
+    for (let y = 0; y < h; y++) {
+      const my = Math.min(sh - 1, ((y * sh) / h) | 0);
+      for (let x = 0; x < w; x++) {
+        const mx = Math.min(sw - 1, ((x * sw) / w) | 0);
+        const m = mask[my * sw + mx] * amt;
+        if (m < 0.01) continue;
+        const i = (y * w + x) * 4;
+        d[i] = clamp(d[i] + m * 95, 0, 255);
+        d[i + 1] = clamp(d[i + 1] + m * 28, 0, 255);
+        d[i + 2] = clamp(d[i + 2] + m * 12, 0, 255);
+      }
+    }
+  }
+
+  // 颗粒 Grain
+  if (p.grain > 0) {
+    const strength = p.grain / 100;
+    for (let i = 0; i < d.length; i += 4) {
+      const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      // 中间调颗粒更明显
+      const lumW = 1 - Math.abs(L / 255 - 0.5) * 1.2;
+      const n = (Math.random() - 0.5) * strength * 42 * Math.max(0.15, lumW);
+      d[i] = clamp(d[i] + n, 0, 255);
+      d[i + 1] = clamp(d[i + 1] + n * 0.95, 0, 255);
+      d[i + 2] = clamp(d[i + 2] + n * 0.9, 0, 255);
     }
   }
 
@@ -659,8 +737,9 @@ async function askLLMGrade(canvas, userIntent, meta) {
 
   const system = `你是专业摄影调色师。根据用户想要的效果，给出 Lightroom 风格调色参数。
 只输出 JSON，不要 markdown，格式：
-{"exposure":-0.2,"contrast":15,"highlights":-25,"shadows":20,"whites":0,"blacks":0,"temp":10,"tint":5,"vibrance":15,"saturation":0,"clarity":8,"fade":5,"vignette":10,"note":"一句话说明"}
-参数范围：exposure -2..2，其余 -100..100（fade/vignette 0..100）。`;
+{"exposure":-0.2,"contrast":15,"highlights":-25,"shadows":20,"whites":0,"blacks":0,"temp":10,"tint":5,"vibrance":15,"saturation":0,"clarity":8,"fade":5,"vignette":10,"grain":12,"halation":20,"note":"一句话说明"}
+参数范围：exposure -2..2；fade/vignette/grain/halation 0..100；其余 -100..100。
+胶片/夜景霓虹可适当 grain、halation；商业干净片两者取 0。`;
 
   const userText = `用户想要：${userIntent}
 画面信息：均值亮度 ${meta.meanL}，对比 ${meta.contrast}，动态范围 ${meta.dynamicRange}，饱和度 ${meta.sat}，色温倾向 ${meta.warmth}
@@ -763,6 +842,8 @@ async function askLLMGrade(canvas, userIntent, meta) {
   params.clarity = num(parsed.clarity, -100, 100, 0);
   params.fade = num(parsed.fade, 0, 100, 0);
   params.vignette = num(parsed.vignette, 0, 100, 0);
+  params.grain = num(parsed.grain, 0, 100, 0);
+  params.halation = num(parsed.halation, 0, 100, 0);
 
   return {
     params,

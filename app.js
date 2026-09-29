@@ -588,6 +588,8 @@ const GRADE_SLIDERS = [
   { key: "clarity", name: "清晰度", min: -100, max: 100, scale: 1, group: "effect" },
   { key: "fade", name: "褪色", min: 0, max: 100, scale: 1, group: "effect" },
   { key: "vignette", name: "暗角", min: 0, max: 100, scale: 1, group: "effect" },
+  { key: "grain", name: "颗粒", min: 0, max: 100, scale: 1, group: "effect" },
+  { key: "halation", name: "光晕", min: 0, max: 100, scale: 1, group: "effect" },
 ];
 
 const GRADE_GROUP_IDS = {
