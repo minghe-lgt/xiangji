@@ -36,7 +36,3 @@ py -m http.server 8000
 - RAW 支持：提取内嵌 JPEG 预览（ARW/CR2/NEF/DNG 等），标注有损
 - 快选片：千张级缩略图、`content-visibility` 跳过视口外渲染、3 路并发 AI 精评
 - 无障碍与降级：字体外链失败自动回退；未配置 Key 时所有本地功能完整可用
-
-## 许可证
-
-[MIT](LICENSE)

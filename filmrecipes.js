@@ -1,5 +1,5 @@
 /**
- * 「胶片坊」— 映射自 Recipe Lab（MIT · voxivoid/recipe-lab-sony-pmca）全 77 条
+ * 「胶片坊」— 映射自 Recipe Lab（开源项目 voxivoid/recipe-lab-sony-pmca）全 77 条
  * Sony Creative Style 钳位参数 → 本页调色引擎近似；含颗粒/光晕质感，非机内色彩科学 1:1。
  */
 const FILM_RECIPE_PRESETS = [

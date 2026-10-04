@@ -26,7 +26,7 @@
   <rect x="60" y="190" width="400" height="70" rx="10" fill="#241f19" stroke="#3a322a"/>
   <text x="80" y="214" fill="#f0e6d6" font-size="14" font-weight="600">内容与知识库</text>
   <text x="80" y="234" fill="#8a7d6c" font-size="11">data.js（24 周课程 · 66 题诊断题库 · 书单）</text>
-  <text x="80" y="250" fill="#8a7d6c" font-size="11">filmrecipes.js（77 条胶片预设 · MIT 映射近似）</text>
+  <text x="80" y="250" fill="#8a7d6c" font-size="11">filmrecipes.js（77 条胶片预设 · 参数近似映射）</text>
 
   <!-- 图像处理层 -->
   <rect x="500" y="190" width="400" height="70" rx="10" fill="#241f19" stroke="#3a322a"/>
