@@ -1813,6 +1813,17 @@ select { font: inherit; color: inherit; }
   font-size: 1rem;
 }
 
+.grade-hist-wrap {
+  margin-bottom: 12px;
+}
+
+#gradeHist {
+  width: 100%;
+  height: 72px;
+  border-radius: 8px;
+  display: block;
+}
+
 .slider-list {
   display: flex;
   flex-direction: column;
@@ -1869,6 +1880,49 @@ select { font: inherit; color: inherit; }
   font-size: 0.62rem;
   letter-spacing: 0.08em;
   vertical-align: middle;
+}
+
+.mask-btns {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mask-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mask-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-mid);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.mask-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  font-size: 0.84rem;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.toggle-row input {
+  accent-color: var(--accent);
 }
 
 .ai-block {
@@ -2521,6 +2575,9 @@ body.mode-tool [data-group="learn"] {
   cursor: pointer;
   background: rgba(0, 0, 0, 0.2);
   transition: border-color 0.15s, transform 0.15s;
+  /* 千张级：跳过视口外单元格的布局与绘制，滚动时按此估计占位 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
 }
 
 .cull-cell:hover {
@@ -2592,6 +2649,10 @@ body.mode-tool [data-group="learn"] {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--sage);
+}
+
+.cull-score.ai {
+  color: var(--accent);
 }
 
 .cull-name {
@@ -3278,6 +3339,72 @@ body.mode-tool [data-group="learn"] {
   box-shadow: var(--shadow);
 }
 
+/* ===== 作业点评（复用 assess 弹层壳） ===== */
+#hwNote {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.88rem;
+  margin-bottom: 12px;
+  resize: vertical;
+}
+
+#hwNote:focus {
+  outline: none;
+  border-color: rgba(212, 160, 84, 0.6);
+}
+
+.hw-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hw-report {
+  background: var(--paper);
+  color: #2a241c;
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  box-shadow: var(--shadow);
+}
+
+.hw-report .hw-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.hw-report .hw-score strong {
+  font-size: 2rem;
+  color: #b07a32;
+}
+
+.hw-report h5 {
+  margin: 14px 0 6px;
+  font-size: 0.95rem;
+}
+
+.hw-report ul {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: #5c5244;
+}
+
+.hw-report p {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #5c5244;
+}
+
 .report-hero {
   display: flex;
   gap: 22px;
@@ -3823,6 +3950,35 @@ body.mode-tool [data-group="learn"] {
   .path-strip { grid-template-columns: repeat(2, 1fr); }
   .tech-table { grid-template-columns: 1fr; }
   .kicker-title { font-size: 1.45rem; }
+}
+
+.collage-preview {
+  margin-top: 12px;
+  min-height: 80px;
+}
+
+.collage-preview canvas {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #learningReportPaper,
+  #learningReportPaper * {
+    visibility: visible;
+  }
+  #learningReportPaper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none;
+    background: white;
+    color: #2a241c;
+  }
 }
 
 /* ========== Progress / Journal — cascade override ========== */

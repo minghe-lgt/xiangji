@@ -104,9 +104,59 @@ function starsHtml(n) {
   return s;
 }
 
+/** 卡片说明文字（星标 + 分数 + 文件名），重建与原地更新共用 */
+function cullCardCaption(it) {
+  const score =
+    it.aiScore != null
+      ? `<em class="cull-score ai">${it.aiScore}</em>`
+      : it.localScore != null
+        ? `<em class="cull-score">${it.localScore}</em>`
+        : "";
+  return `<span class="cull-stars">${starsHtml(it.stars)}${score}</span>
+      <span class="cull-name">${esc(it.name.slice(0, 14))}${it.autoNote ? " · " + esc(it.autoNote) : ""}</span>`;
+}
+
+/** 状态变化只更新受影响的那张卡，避免千张级全量重建 */
+function syncCullCard(it) {
+  const idx = cullState.filtered.indexOf(it);
+  if (idx < 0) return;
+  const cell = $(`#cullGrid .cull-cell[data-idx="${idx}"]`);
+  if (!cell) return;
+  cell.classList.toggle("is-pick", it.status === "pick");
+  cell.classList.toggle("is-reject", it.status === "reject");
+  const flag = cell.querySelector(".cull-flag");
+  if (flag) flag.textContent = it.status === "pick" ? "入选" : it.status === "reject" ? "否" : "";
+  const cap = cell.querySelector("figcaption");
+  if (cap) cap.innerHTML = cullCardCaption(it);
+}
+
+/** 当前过滤条件下该项是否应在列（用于判断按键后名单是否变化） */
+function cullInFilter(x) {
+  const f = cullState.filter;
+  if (f === "new") return x.status === "new";
+  if (f === "pick") return x.status === "pick";
+  if (f === "reject") return x.status === "reject";
+  if (f === "star") return (x.stars || 0) >= (cullState.minStars || 3);
+  if (f === "candidate") return x.status === "pick" || (x.stars || 0) >= 3;
+  return true;
+}
+
+/** 焦点切换：只动上一格和当前格，不做全网格遍历 */
+function setActiveCullCell() {
+  const el = $(`#cullGrid .cull-cell[data-idx="${cullState.index}"]`);
+  const prev = cullState._activeCell;
+  if (prev !== el) {
+    prev?.classList.remove("is-active");
+    el?.classList.add("is-active");
+    cullState._activeCell = el;
+  }
+  el?.scrollIntoView({ block: "nearest" });
+}
+
 function renderCullGrid() {
   const box = $("#cullGrid");
   if (!box) return;
+  cullState._activeCell = null;
   if (!cullState.filtered.length) {
     box.innerHTML = `<p class="cull-empty">没有符合条件的照片</p>`;
     return;
@@ -118,18 +168,16 @@ function renderCullGrid() {
       const mark =
         it.status === "pick" ? "is-pick" : it.status === "reject" ? "is-reject" : "";
       return `
-      <figure class="cull-cell ${mark} ${idx === cullState.index ? "is-active" : ""}" data-idx="${idx}" title="${it.name}">
+      <figure class="cull-cell ${mark} ${idx === cullState.index ? "is-active" : ""}" data-idx="${idx}" title="${esc(it.name)}">
         <div class="cull-thumb-wrap">
           <img data-src="${it.thumbUrl || ""}" alt="" loading="lazy" />
           <span class="cull-flag">${it.status === "pick" ? "入选" : it.status === "reject" ? "否" : ""}</span>
         </div>
-        <figcaption>
-          <span class="cull-stars">${starsHtml(it.stars)}${it.localScore != null ? `<em class="cull-score">${it.localScore}</em>` : ""}</span>
-          <span class="cull-name">${it.name.slice(0, 14)}${it.autoNote ? " · " + it.autoNote : ""}</span>
-        </figcaption>
+        <figcaption>${cullCardCaption(it)}</figcaption>
       </figure>`;
     })
     .join("");
+  cullState._activeCell = $(`#cullGrid .cull-cell[data-idx="${cullState.index}"]`);
   // lazy load via observer
   if (cullState.observer) cullState.observer.disconnect();
   cullState.observer = new IntersectionObserver(
@@ -165,18 +213,13 @@ function renderCullFocus() {
   if (it.localScore != null) scoreLine.push(`本地 ${it.localScore}`);
   if (it.autoNote) scoreLine.push(it.autoNote);
   stage.innerHTML = `
-    <img src="${it.thumbUrl || it.objectUrl || ""}" alt="${it.name}" id="cullBigImg" class="${zoomCls}" />
+    <img src="${it.thumbUrl || it.objectUrl || ""}" alt="${esc(it.name)}" id="cullBigImg" class="${zoomCls}" />
     <div class="cull-big-flag ${it.status}">${it.status === "pick" ? "已入选" : it.status === "reject" ? "已否决" : "未评"}</div>
   `;
-  $("#cullMeta").innerHTML = `<div>${it.name} · ${it.w || "?"}×${it.h || "?"} · ${(it.size / 1024 / 1024).toFixed(1)}MB · ★${it.stars}</div>
-    <div>${scoreLine.join(" · ") || "—"}</div>
+  $("#cullMeta").innerHTML = `<div>${esc(it.name)} · ${it.w || "?"}×${it.h || "?"} · ${(it.size / 1024 / 1024).toFixed(1)}MB · ★${it.stars}</div>
+    <div>${esc(scoreLine.join(" · ")) || "—"}</div>
     <div>位置 ${cullState.index + 1} / ${cullState.filtered.length}</div>`;
-  $$("#cullGrid .cull-cell").forEach((el) => {
-    el.classList.toggle("is-active", Number(el.dataset.idx) === cullState.index);
-  });
-  // 让当前缩略图进入视野
-  const active = $(`#cullGrid .cull-cell[data-idx="${cullState.index}"]`);
-  active?.scrollIntoView({ block: "nearest" });
+  setActiveCullCell();
 }
 
 function cullAct(action) {
@@ -188,6 +231,11 @@ function cullAct(action) {
     cullState.undoStack.push(snapshot);
     if (cullState.undoStack.length > 50) cullState.undoStack.shift();
   };
+  // 评分类操作先记录「是否在当前过滤名单里」，结束后对比决定要不要重建名单
+  let membershipBefore = null;
+  if (action === "pick" || action === "reject" || action.startsWith("star")) {
+    membershipBefore = cullInFilter(it);
+  }
 
   if (action === "pick") {
     pushUndo();
@@ -231,10 +279,18 @@ function cullAct(action) {
   if (cullState.index >= cullState.filtered.length) {
     cullState.index = Math.max(0, cullState.filtered.length - 1);
   }
-  renderCullGrid();
-  renderCullFocus();
+  // 名单没变的评分/翻页走快速路径，只有名单进出才全量重建
+  if (membershipBefore !== null && membershipBefore !== cullInFilter(it)) {
+    applyCullFilter();
+  } else if (action === "pick" || action === "reject" || action.startsWith("star")) {
+    syncCullCard(it);
+    renderCullFocus();
+  } else if (action !== "undo") {
+    renderCullFocus();
+  } else {
+    applyCullFilter();
+  }
   cullStats();
-  applyCullFilter();
 }
 
 async function cullAddFiles(fileList, handleMap) {
@@ -285,7 +341,11 @@ async function cullAddFiles(fileList, handleMap) {
       };
       cullState.items.push(item);
     } catch (e) {
-      cullLog(`跳过 ${f.name}: ${e.message || e}`, "err");
+      if (/\.(cr3|heic|avif)$/i.test(f.name)) {
+        cullLog(`跳过 ${f.name}：CR3/HEIC/AVIF 暂不支持解析，请用相机 RAW+JPEG 或先转成 JPG`, "err");
+      } else {
+        cullLog(`跳过 ${f.name}: ${e.message || e}`, "err");
+      }
     }
     if (i % 50 === 0) {
       $("#cullStatus").textContent = `生成缩略图 ${i + 1} / ${files.length}`;
@@ -325,6 +385,7 @@ async function cullLocalScoreItem(item, cache) {
     const lum = new Float32Array(w * h);
     let sum = 0, sum2 = 0;
     let satSum = 0;
+    let skinN = 0; // 皮肤色像素占比：判断画面是否人像（决定眼部带检查是否适用）
     for (let i = 0, p = 0; i < d.length; i += 4, p++) {
       const r = d[i], g = d[i + 1], b = d[i + 2];
       const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -333,6 +394,7 @@ async function cullLocalScoreItem(item, cache) {
       sum2 += L * L;
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
       satSum += mx === 0 ? 0 : (mx - mn) / mx;
+      if (r > 95 && g > 40 && b > 20 && mx - mn > 15 && Math.abs(r - g) > 15 && r > g && r > b) skinN++;
     }
     const n = w * h;
     const mean = sum / n;
@@ -361,8 +423,22 @@ async function cullLocalScoreItem(item, cache) {
     // 主体区更糊则更可疑
     const sharpFinal = clampNum(sharpScore * 0.55 + Math.min(sharpScore, sharpCenter) * 0.45, 0, 100);
 
-    // 曝光
-    const expScore = clampNum(100 - Math.abs(mean - 118) / 118 * 140, 0, 100);
+    // 曝光：目标亮度按图片自身的影调分布自适应。
+    // 旧版硬编码 118，雪景被判过曝、夜景被判欠曝；现取直方图 5%/95% 分位的中点
+    // 作为「理想中间调」，典型场景结果 ≈118 与旧值兼容，雪景/夜景不再冤枉。
+    const hist = new Uint32Array(256);
+    for (let p = 0; p < n; p++) hist[lum[p] | 0]++;
+    const pctOf = (frac) => {
+      let acc = 0;
+      const limit = n * frac;
+      for (let v = 0; v < 256; v++) {
+        acc += hist[v];
+        if (acc >= limit) return v;
+      }
+      return 255;
+    };
+    const expTarget = (pctOf(0.05) + pctOf(0.95)) / 2;
+    const expScore = clampNum(100 - Math.abs(mean - expTarget) / Math.max(30, expTarget) * 140, 0, 100);
 
     // 剪裁（死黑/死白）
     let clipped = 0;
@@ -384,12 +460,63 @@ async function cullLocalScoreItem(item, cache) {
     item.contrastScore = Math.round(contrastScore);
     item.colorScore = Math.round(colorScore);
 
+    // 4x4 色块签名，用于连拍去重
+    const sig = new Array(16).fill(0);
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        const i = (y * w + x) * 4;
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const qx = x < w / 2 ? 0 : 1;
+        const qy = y < h / 2 ? 0 : 1;
+        const q = qy * 2 + qx; // 0..3
+        sig[q * 4 + 0] += r;
+        sig[q * 4 + 1] += g;
+        sig[q * 4 + 2] += b;
+        sig[q * 4 + 3] += 1;
+      }
+    }
+    const avgSig = [];
+    for (let q = 0; q < 4; q++) {
+      const n = sig[q * 4 + 3] || 1;
+      avgSig.push(sig[q * 4] / n, sig[q * 4 + 1] / n, sig[q * 4 + 2] / n);
+    }
+    // 眼部带细节：仅当画面像人像（皮肤色占比够高）才有意义。
+    // 风光/静物此前也被算出 85 分上下的「面部基线」并计入总分，属于误伤，现跳过。
+    const skinRatio = skinN / n;
+    let faceScore;
+    if (skinRatio > 0.12) {
+      let eyeBand = 0, eyeN = 0;
+      const y0 = Math.floor(h * 0.28);
+      const y1 = Math.floor(h * 0.52);
+      const x0 = Math.floor(w * 0.28);
+      const x1 = Math.floor(w * 0.72);
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const i = y * w + x;
+          eyeBand += Math.abs(lum[i + 1] - lum[i - 1]) + Math.abs(lum[i + w] - lum[i - w]);
+          eyeN++;
+        }
+      }
+      const eyeEdge = eyeN ? eyeBand / eyeN : 0;
+      // 相对全身锐度：眼睛区应更锐
+      const eyeRatio = edgeMean > 0.5 ? eyeEdge / edgeMean : 1;
+      faceScore = clampNum(40 + eyeRatio * 45, 0, 100);
+      item.eyeScore = Math.round(faceScore);
+    } else {
+      faceScore = 75; // 中性值：不为人像时眼部项不倾斜总分
+      item.eyeScore = null;
+    }
+
+    item.sig = avgSig;
+
     const floor = Math.min(sharpFinal, expScore, clipScore, contrastScore);
     item.localScore = Math.round(
-      floor * 0.5 + (sharpFinal * 0.28 + expScore * 0.22 + clipScore * 0.2 + contrastScore * 0.15 + colorScore * 0.15) * 0.5
+      floor * 0.42 +
+      (sharpFinal * 0.24 + expScore * 0.18 + clipScore * 0.16 + contrastScore * 0.12 + colorScore * 0.1 + faceScore * 0.2) * 0.58
     );
     item._scoredLocal = true;
-  } catch {
+  } catch (e) {
+    console.warn("cullLocalScoreItem failed:", item.name, e);
     item.localScore = 0;
     item._scoredLocal = true;
   }
@@ -432,15 +559,22 @@ async function cullSmartPrescan() {
 
     cullState.items.sort((a, b) => (b.localScore || 0) - (a.localScore || 0));
 
-    // 连拍：同时间窗且分数接近，只留队首
+    // 连拍：时间窗 + 色块签名接近 → 只留队首
     const kept = [];
     for (const it of cullState.items) {
       let similar = false;
-      for (const k of kept.slice(-35)) {
-        if (
-          Math.abs((it.lastModified || 0) - (k.lastModified || 0)) < 5000 &&
-          Math.abs((it.localScore || 0) - (k.localScore || 0)) < 7
-        ) {
+      for (const k of kept.slice(-40)) {
+        const dt = Math.abs((it.lastModified || 0) - (k.lastModified || 0));
+        if (dt > 8000) continue;
+        if (it.sig && k.sig) {
+          let dist = 0;
+          for (let i = 0; i < it.sig.length; i++) dist += Math.abs(it.sig[i] - k.sig[i]);
+          dist /= it.sig.length;
+          if (dist < 18) {
+            similar = true;
+            break;
+          }
+        } else if (Math.abs((it.localScore || 0) - (k.localScore || 0)) < 7) {
           similar = true;
           break;
         }
@@ -453,7 +587,6 @@ async function cullSmartPrescan() {
         it.status = "reject";
         it.autoNote = "糊/爆/灰，技术废片";
       } else if ((it.localScore || 0) >= Math.max(86, p88) && (it.contrastScore || 0) >= 55) {
-        // 只标「候选」，不一定是好看——仍建议 AI 精评
         if (it.status === "new") {
           it.status = "pick";
           it.stars = 3;
@@ -478,10 +611,17 @@ async function cullSmartPrescan() {
 }
 
 /**
- * AI 精评：把缩略图发给已配置的大模型，批量给分（建议 ≤40 张）
+ * AI 精评：把缩略图发给已配置的大模型，批量给分（建议 ≤40 张）。
+ * 3 路并发 + 每张失败自动重试 1 次；运行中再点按钮 = 停止（已完成的不回滚）。
  */
+let cullAIRunning = false;
+
 async function cullAIScore() {
   if (!cullState.items.length) return alert("请先导入照片");
+  if (cullAIRunning) {
+    cullState.aiAbort = true; // 运行中点击 → 请求停止
+    return;
+  }
   if (typeof llmConfigReady === "function" && !llmConfigReady()) {
     return alert("请先在「调色工作台 → 厂商设置」配置 API Key");
   }
@@ -493,23 +633,13 @@ async function cullAIScore() {
   if (!pool.length) return alert("没有可评的照片");
 
   const btn = $("#cullAIBtn");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "AI 评分中…";
-  }
-  try {
-    for (let i = 0; i < pool.length; i++) {
-      const it = pool[i];
-      $("#cullStatus").textContent = `AI 评分 ${i + 1} / ${pool.length}`;
-      try {
-        const img = await loadImage(it.thumbUrl || URL.createObjectURL(it.file));
-        const c = document.createElement("canvas");
-        const s = Math.min(1, 512 / Math.max(img.naturalWidth, img.naturalHeight));
-        c.width = Math.round(img.naturalWidth * s);
-        c.height = Math.round(img.naturalHeight * s);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  cullAIRunning = true;
+  cullState.aiAbort = false;
+  if (btn) btn.textContent = "停止";
 
-        const system = `你是极其严格的人像/商业选片师，宁缺毋滥，只给客户成片级别的照片高分。
+  const scoreOne = async (it) => {
+    // 返回 true=成功（含中止）/ false=最终失败
+    const system = `你是极其严格的人像/商业选片师，宁缺毋滥，只给客户成片级别的照片高分。
 只输出 JSON：{"score":0-100,"reject":true|false,"reason":"12字内"}
 
 评分权重：
@@ -524,6 +654,22 @@ async function cullAIScore() {
 - 80–89 = 备选（有瑕疵）
 - <80 或任一硬伤 → reject true
 拿不准就低分或 reject。`;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      if (cullState.aiAbort) return true;
+      try {
+        const url = it.thumbUrl || URL.createObjectURL(it.file);
+        let img;
+        try {
+          img = await loadImage(url);
+        } finally {
+          if (!it.thumbUrl) URL.revokeObjectURL(url);
+        }
+        const c = document.createElement("canvas");
+        const s = Math.min(1, 512 / Math.max(img.naturalWidth, img.naturalHeight));
+        c.width = Math.round(img.naturalWidth * s);
+        c.height = Math.round(img.naturalHeight * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+
         const res = await callLLMVision({
           system,
           userText: "评价这张是否值得进客户成片。先看脸，再看构图与穿帮。标准要严。",
@@ -548,18 +694,49 @@ async function cullAIScore() {
           }
           it.localScore = Math.round(it.aiScore);
         }
+        return true;
       } catch (e) {
-        cullLog(`${it.name}: ${e.message || e}`, "err");
+        if (cullState.aiAbort) return true;
+        if (attempt === 2) {
+          cullLog(`${it.name}: ${e.message || e}`, "err");
+          return false;
+        } else {
+          await new Promise((r) => setTimeout(r, 900)); // 退避后重试一次
+        }
       }
     }
+    return false;
+  };
+
+  let done = 0;
+  let failed = 0;
+  try {
+    const queue = [...pool];
+    const worker = async () => {
+      while (queue.length && !cullState.aiAbort) {
+        const it = queue.shift();
+        const ok = await scoreOne(it);
+        done++;
+        if (!ok) failed++;
+        $("#cullStatus").textContent = cullState.aiAbort
+          ? `AI 评分已停止（${done} / ${pool.length}）`
+          : `AI 评分 ${done} / ${pool.length}`;
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+
     cullState.items.sort((a, b) => (b.aiScore || b.localScore || 0) - (a.aiScore || a.localScore || 0));
-    cullLog(`AI 评分完成 ${pool.length} 张`, "ok");
-    $("#cullStatus").textContent = `AI 评分完成（${pool.length} 张）`;
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "AI 精评";
+    if (cullState.aiAbort) {
+      cullLog(`AI 评分已停止：完成 ${done} / ${pool.length} 张`, "err");
+      $("#cullStatus").textContent = `AI 评分已停止（${done} / ${pool.length}）`;
+    } else {
+      cullLog(`AI 评分完成 ${done} / ${pool.length} 张${failed ? ` · 未成功 ${failed}` : ""}`, failed ? "err" : "ok");
+      $("#cullStatus").textContent = `AI 评分完成（${done} / ${pool.length}）`;
     }
+  } finally {
+    cullAIRunning = false;
+    cullState.aiAbort = false;
+    if (btn) btn.textContent = "AI 精评";
     cullStats();
     applyCullFilter();
   }
@@ -630,6 +807,13 @@ function setupCull() {
     const cell = e.target.closest("[data-idx]");
     if (!cell) return;
     cullState.index = Number(cell.dataset.idx);
+    renderCullFocus();
+  });
+  $("#cullGrid")?.addEventListener("dblclick", (e) => {
+    const cell = e.target.closest("[data-idx]");
+    if (!cell) return;
+    cullState.index = Number(cell.dataset.idx);
+    cullState.zoom = "100";
     renderCullFocus();
   });
 

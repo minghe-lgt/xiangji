@@ -70,8 +70,9 @@ function imageBlobSize(blob) {
 /**
  * 从 TIFF/RAW 容器扫描所有内嵌 JPEG，选像素最大的。
  * 同时读取 CFA/SubIFD 上的完整 RAW 分辨率。
+ * onProgress: 可选，全文件兜底扫描时的进度回调 0..1
  */
-async function extractRawPreview(buffer) {
+async function extractRawPreview(buffer, onProgress) {
   const dv = new DataView(buffer);
   if (buffer.byteLength < 8) throw new Error("文件太小，不是有效的 RAW/TIFF");
 
@@ -99,7 +100,7 @@ async function extractRawPreview(buffer) {
 
   if (le === undefined) {
     // 兜底：全文件扫 JPEG
-    const all = scanAllJpegs(new Uint8Array(buffer));
+    const all = await scanAllJpegs(new Uint8Array(buffer), onProgress);
     if (!all.length) throw new Error("无法识别的 RAW 格式");
     all.sort((a, b) => b.pixels - a.pixels);
     return await finalizeCandidate(all[0], buffer.byteLength);
@@ -107,7 +108,7 @@ async function extractRawPreview(buffer) {
 
   const magic = readU16(dv, 2, le);
   if (magic !== 42) {
-    const all = scanAllJpegs(new Uint8Array(buffer));
+    const all = await scanAllJpegs(new Uint8Array(buffer), onProgress);
     if (!all.length) throw new Error("TIFF 标记异常");
     all.sort((a, b) => b.pixels - a.pixels);
     return await finalizeCandidate(all[0], buffer.byteLength);
@@ -226,11 +227,15 @@ async function extractRawPreview(buffer) {
 
   readIFD(readU32(dv, 4, le), 0);
 
-  // 全文件扫描补漏（有的预览不在 IFD 标签里）
-  const scanned = scanAllJpegs(new Uint8Array(buffer));
-  for (const s of scanned) {
-    if (!candidates.some((c) => c.bytes.length === s.bytes.length && c.pixels === s.pixels)) {
-      candidates.push({ ...s, kind: "jpeg-scan" });
+  // 全文件扫描补漏：仅当 IFD 一无所获，或最大候选仍是缩略图级时才值得扫。
+  // 现代机身的 IFD 预览通常就是全尺寸，直接跳过这个最重的步骤。
+  const bestPixels = candidates.reduce((m, c) => Math.max(m, c.pixels), 0);
+  if (candidates.length === 0 || bestPixels < 1200000) {
+    const scanned = await scanAllJpegs(new Uint8Array(buffer), onProgress);
+    for (const s of scanned) {
+      if (!candidates.some((c) => c.bytes.length === s.bytes.length && c.pixels === s.pixels)) {
+        candidates.push({ ...s, kind: "jpeg-scan" });
+      }
     }
   }
 
@@ -240,46 +245,68 @@ async function extractRawPreview(buffer) {
     );
   }
 
-  // 选像素最多的（真分辨率优先）
+  // 像素优先；同分辨率时选码流更大的（通常压缩更好）
   candidates.sort((a, b) => {
     if (b.pixels !== a.pixels) return b.pixels - a.pixels;
     return b.bytes.length - a.bytes.length;
   });
 
+  // 若最大预览很小（缩略图级），警告文案会带 raw 尺寸
   return await finalizeCandidate(candidates[0], buffer.byteLength, rawWidth, rawHeight, rawBits, candidates.length);
 }
 
-function scanAllJpegs(bytes) {
+/** 全文件 JPEG 扫描：分块让出主线程，onProgress 0..1。
+ *  内层找结尾最多看 64MB——CFA 数据里可能出现伪 FFD8FF，不设上限会退化成 O(N²)。 */
+async function scanAllJpegs(bytes, onProgress) {
   const found = [];
-  for (let i = 0; i < bytes.length - 4; i++) {
+  const MAX_CANDIDATE = 64 * 1024 * 1024;
+  const CHUNK = 1 << 20; // 每 ~1MB 让出一次
+  let nextYield = CHUNK;
+  let i = 0;
+  while (i < bytes.length - 4) {
     if (bytes[i] === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff) {
-      for (let j = i + 3; j < bytes.length - 1; j++) {
+      const limit = Math.min(bytes.length - 1, i + MAX_CANDIDATE);
+      let end = -1;
+      for (let j = i + 3; j < limit; j++) {
         if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
-          const slice = bytes.subarray(i, j + 2);
-          if (slice.length > 30000) {
-            const dim = jpegDimensions(slice);
-            const width = dim ? dim.width : 0;
-            const height = dim ? dim.height : 0;
-            found.push({
-              bytes: slice,
-              width,
-              height,
-              pixels: width * height,
-              kind: "jpeg-scan",
-            });
-          }
+          end = j + 2;
           break;
         }
       }
-      i += 2;
+      if (end > 0) {
+        const slice = bytes.subarray(i, end);
+        // 忽略过小的缩略图
+        if (slice.length > 25000) {
+          const dim = jpegDimensions(slice);
+          const width = dim ? dim.width : 0;
+          const height = dim ? dim.height : 0;
+          found.push({
+            bytes: slice,
+            width,
+            height,
+            pixels: width * height,
+            kind: "jpeg-scan",
+          });
+        }
+        i = end;
+      } else {
+        i += 3; // 伪起始标记
+      }
+    } else {
+      i++;
+    }
+    if (i >= nextYield) {
+      nextYield = i + CHUNK;
+      onProgress?.(i / bytes.length);
+      await new Promise((r) => setTimeout(r, 0));
     }
   }
+  onProgress?.(1);
   return found;
 }
 
 async function finalizeCandidate(best, fileSize, rawW, rawH, rawBits, total) {
-  // 保留原始 JPEG 字节，导出「原图」时可零重编码
-  const originalBytes = best.bytes;
+  // Blob 构造即拷贝：JPEG 字节自持，不再引用整个 RAW 缓冲（否则大文件无法 GC）
   const blob = new Blob([best.bytes], { type: "image/jpeg" });
   const dim = await imageBlobSize(blob);
   const width = dim.width || best.width;
@@ -295,7 +322,6 @@ async function finalizeCandidate(best, fileSize, rawW, rawH, rawBits, total) {
 
   return {
     blob,
-    originalBytes,
     width,
     height,
     rawWidth: rawW || 0,
@@ -331,7 +357,6 @@ async function loadPhotoFile(file) {
         rawHeight: preview.rawHeight,
         isFullRaw: preview.isFullRaw,
         originalBlob: preview.blob,
-        originalBytes: preview.originalBytes || null,
         originalName: file.name.replace(/\.[^.]+$/i, "") + "-preview.jpg",
         cleanup: () => URL.revokeObjectURL(url),
       };
@@ -350,7 +375,6 @@ async function loadPhotoFile(file) {
       rawHeight: img.naturalHeight,
       isFullRaw: true,
       originalBlob: file,
-      originalBytes: null,
       originalName: file.name,
       cleanup: () => URL.revokeObjectURL(url),
     };

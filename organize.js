@@ -193,9 +193,13 @@ function parseTiffExif(dv, buffer, le, ifdOffset, tiffBase = 0) {
 
     if (Object.keys(gps).length) {
       if (gps.lat != null && gps.lon != null) {
-        const lat = gps.latRef === "S" ? -gps.lat : gps.lat;
-        const lon = gps.lonRef === "W" ? -gps.lon : gps.lon;
-        out.gps = { lat, lon };
+        // 半球标记缺失时不猜方向（南半球照片会被默认成北纬），
+        // refKnown=false 让使用方知道经纬号是不带符号语义的
+        out.gps = {
+          lat: gps.latRef === "S" ? -gps.lat : gps.lat,
+          lon: gps.lonRef === "W" ? -gps.lon : gps.lon,
+          refKnown: !!(gps.latRef && gps.lonRef),
+        };
       }
     }
 
@@ -289,22 +293,30 @@ function classifyImage(img, fileName) {
   const aspect = img.naturalWidth / img.naturalHeight;
 
   const name = (fileName || "").toLowerCase();
+  // 文件名提示：只认有区分度的词。此前的 dsc_/img_ 会命中所有相机原文件，
+  // 提示无效导致死代码；现在作为弱先验参与分类（需内容证据佐证）。
   const nameHints = {
-    人像: /portrait|dsc_|img_\d|face|人像|写真/.test(name),
-    风光: /landscape|dsc_\d|view|scenery|风光|风景/.test(name),
-    静物: /food|still|product|静物|美食/.test(name),
-    文档: /scan|doc|paper|screenshot|截图|文档/.test(name),
+    人像: /portrait|face|人像|写真/i.test(name),
+    风光: /landscape|scenery|风光|风景/i.test(name),
+    静物: /food|still|product|静物|美食/i.test(name),
+    文档: /scan|doc|paper|screenshot|截图|文档/i.test(name),
   };
 
   // 规则优先级
   if (nameHints.文档 || (sat < 0.12 && meanL > 140 && skinR < 0.02 && skyR < 0.05)) {
     return { category: "文档", confidence: 0.75, reason: "低饱和高亮 / 文件名像文档" };
   }
+  if (nameHints.人像 && skinR > 0.03) {
+    return { category: "人像", confidence: 0.8, reason: "文件名像人像 + 肤色佐证" };
+  }
   if (skinR > 0.1) {
     return { category: "人像", confidence: 0.72, reason: "肤色像素占比高" };
   }
   if (darkR > 0.35 && meanL < 70) {
     return { category: "夜景", confidence: 0.7, reason: "整体偏暗" };
+  }
+  if (nameHints.风光 && skyR + greenR > 0.12) {
+    return { category: "风光", confidence: 0.75, reason: "文件名像风光 + 天空/植被佐证" };
   }
   if (skyR > 0.18 || greenR > 0.22) {
     return { category: "风光", confidence: 0.68, reason: skyR > greenR ? "天空占比高" : "植被占比高" };
@@ -314,6 +326,9 @@ function classifyImage(img, fileName) {
   }
   if (aspect < 1.2 && meanL < 110 && darkR > 0.12 && warm > 0) {
     return { category: "街拍", confidence: 0.5, reason: "竖幅城市感" };
+  }
+  if (nameHints.静物 && sat < 0.35 && skinR < 0.05) {
+    return { category: "静物", confidence: 0.6, reason: "文件名像静物 + 画面干净" };
   }
   if (sat < 0.16 && meanL > 100) {
     return { category: "静物", confidence: 0.48, reason: "干净低饱和" };

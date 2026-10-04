@@ -92,7 +92,7 @@ function loadUserPresets() {
   }
 }
 
-function saveUserPreset(name, params, desc) {
+function saveUserPreset(name, params, desc, masks) {
   const list = loadUserPresets();
   const item = {
     id: "u_" + Date.now().toString(36),
@@ -100,10 +100,10 @@ function saveUserPreset(name, params, desc) {
     desc: (desc || "").slice(0, 30),
     cat: "我的",
     params: { ...DEFAULT_GRADE, ...params },
+    masks: Array.isArray(masks) ? masks : [],
     createdAt: new Date().toISOString(),
   };
   list.unshift(item);
-  // 最多 40 个
   localStorage.setItem(USER_PRESET_KEY, JSON.stringify(list.slice(0, 40)));
   return item;
 }
@@ -120,20 +120,94 @@ function exportPresetJSON(preset) {
     name: preset.name,
     desc: preset.desc || "",
     params: preset.params === "AUTO" ? "AUTO" : { ...DEFAULT_GRADE, ...preset.params },
+    masks: preset.masks || [],
   };
 }
 
 function importPresetJSON(obj) {
   if (!obj || typeof obj !== "object") throw new Error("无效的预设文件");
   if (obj.params === "AUTO") {
-    return saveUserPreset(obj.name || "导入预设", DEFAULT_GRADE, obj.desc || "");
+    return saveUserPreset(obj.name || "导入预设", { ...DEFAULT_GRADE }, obj.desc || "");
   }
-  const p = { ...DEFAULT_GRADE, ...(obj.params || {}) };
-  return saveUserPreset(obj.name || "导入预设", p, obj.desc || "");
+  return saveUserPreset(obj.name || "导入预设", sanitizeGradeParams(obj.params), obj.desc || "");
 }
 
-/* ========== 像素级调色 ========== */
-function applyGrade(srcCanvas, params) {
+/* ========== 导入校验（预设来自外部文件，数值不可信） ========== */
+const GRADE_RANGES = {
+  exposure: [-2, 2],
+  fade: [0, 100],
+  vignette: [0, 100],
+  splitStrength: [0, 100],
+  splitHue: [0, 360],
+  splitHueShadow: [0, 360],
+  grain: [0, 100],
+  halation: [0, 100],
+};
+
+function sanitizeGradeParams(raw) {
+  const out = { ...DEFAULT_GRADE };
+  if (!raw || typeof raw !== "object") return out;
+  for (const k of Object.keys(DEFAULT_GRADE)) {
+    const n = Number(raw[k]);
+    if (!Number.isFinite(n)) continue; // 非法值回落默认 0
+    const range = GRADE_RANGES[k] || [-100, 100];
+    out[k] = clamp(n, range[0], range[1]);
+  }
+  return out;
+}
+
+function sanitizeMasks(input) {
+  if (!Array.isArray(input)) return [];
+  const num = (v, lo, hi, dflt) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? clamp(n, lo, hi) : dflt;
+  };
+  return input.slice(0, 12).map((m, i) => {
+    const base = m && m.type === "grad" ? createGradMask() : createRadialMask();
+    if (!m || typeof m !== "object") return base;
+    base.id = typeof m.id === "string" && m.id.length <= 40 ? m.id : base.id + i;
+    base.x = num(m.x, -1, 2, base.x);
+    base.y = num(m.y, -1, 2, base.y);
+    base.feather = num(m.feather, 0, 1, base.feather);
+    base.invert = !!m.invert;
+    if (base.type === "radial") {
+      base.rx = num(m.rx, 0.01, 1.5, base.rx);
+      base.ry = num(m.ry, 0.01, 1.5, base.ry);
+    } else {
+      base.angle = num(m.angle, -360, 360, base.angle);
+      base.length = num(m.length, 0.02, 2, base.length);
+    }
+    base.params = sanitizeGradeParams(m.params);
+    return base;
+  });
+}
+
+/* ========== 像素级调色 ==========
+ * 结构：buildGradeSession 只做一次预计算（LUT/系数），主循环按行带执行，
+ * 同一核心同时服务同步 applyGrade（预览）与分块 applyGradeAsync（全尺寸导出）。
+ * 热循环内零对象分配：HSL 旋钮经模块级 scratch 传递，避免每像素 new Array。
+ */
+const _hslOut = new Float64Array(3);
+
+/** 单个 HSL 旋钮（与旧版逐旋钮累计顺序一致，中间不做钳制） */
+function hslKnob(r, g, b, dh, ds, w, isWarm) {
+  const hueAmt = dh * w * 0.01;
+  let nr = r, ng = g, nb = b;
+  if (isWarm) {
+    nr += hueAmt * 38;
+    nb -= hueAmt * 38;
+  } else {
+    nr -= hueAmt * 38;
+    nb += hueAmt * 38;
+  }
+  const Lv = 0.2126 * nr + 0.7152 * ng + 0.0722 * nb;
+  const sm = 1 + (ds / 100) * w * 0.55;
+  _hslOut[0] = Lv + (nr - Lv) * sm;
+  _hslOut[1] = Lv + (ng - Lv) * sm;
+  _hslOut[2] = Lv + (nb - Lv) * sm;
+}
+
+function buildGradeSession(srcCanvas, params) {
   const w = srcCanvas.width;
   const h = srcCanvas.height;
   const out = document.createElement("canvas");
@@ -165,28 +239,28 @@ function applyGrade(srcCanvas, params) {
   const gGain = 1 - ti * 0.12;
   const bGain = 1 - t * 0.28 + ti * 0.06;
 
+  const hiOn = hi !== 0;
+  const shOn = sh !== 0;
+  const whOn = wh !== 0;
+  const blOn = bl !== 0;
+  const hasSat = sat !== 1 || vib !== 0;
+  const hasFade = fade !== 0;
+  const hasSplit = !!p.splitStrength;
+  const hasHSL =
+    p.hueRed || p.hueOrange || p.hueYellow || p.hueGreen || p.hueAqua || p.hueBlue ||
+    p.satRed || p.satOrange || p.satYellow || p.satGreen || p.satAqua || p.satBlue;
+
   // clarity 是局部对比，这里用亮度域软对比近似
   const clarityCurve = (v) => {
-    if (clarity === 0) return v;
     const x = v / 255;
     const k = clarity * 0.35;
-    // S 曲线，中间调增强
     const y = x + k * (x - 0.5) * (1 - Math.abs(x - 0.5) * 2);
     return clamp(y * 255, 0, 255);
   };
 
   const contrastCurve = (v) => {
     const x = v / 255;
-    if (contrast === 0) return v;
     const y = 0.5 + (x - 0.5) * (1 + contrast * 0.85);
-    return clamp(y * 255, 0, 255);
-  };
-
-  const fadeCurve = (v) => {
-    if (fade === 0) return v;
-    // 抬黑压白
-    const x = v / 255;
-    const y = fade * 0.18 + x * (1 - fade * 0.28);
     return clamp(y * 255, 0, 255);
   };
 
@@ -200,183 +274,55 @@ function applyGrade(srcCanvas, params) {
     return clamp(y * 255, 0, 255);
   };
 
-  // HSL 按红/橙/黄/绿/青/蓝微调
-  const applyFamily = (r, g, b) => {
-    const mx = Math.max(r, g, b);
-    const mn = Math.min(r, g, b);
-    const dlt = mx - mn;
-    if (dlt < 10) return [r, g, b];
-    const fam = {};
-    if (mx === r) {
-      fam.red = g >= b ? (g - b) / dlt : 1;
-      if (g > b) fam.orange = (g - b) / dlt;
-    } else if (mx === g) {
-      fam.green = (b - r) / dlt + 1;
-      if (r > b) fam.yellow = (r - b) / dlt;
-    } else {
-      fam.blue = (r - g) / dlt + 1;
-      if (g > r) fam.aqua = (g - r) / dlt;
-    }
-    let nr = r, ng = g, nb = b;
-    const knobs = [
-      ["red", p.hueRed, p.satRed],
-      ["orange", p.hueOrange, p.satOrange],
-      ["yellow", p.hueYellow, p.satYellow],
-      ["green", p.hueGreen, p.satGreen],
-      ["aqua", p.hueAqua, p.satAqua],
-      ["blue", p.hueBlue, p.satBlue],
-    ];
-    for (const [key, dh, ds] of knobs) {
-      const w = Math.min(1, fam[key] || 0);
-      if (w <= 0.02) continue;
-      const isWarm = key === "red" || key === "orange" || key === "yellow";
-      const hueAmt = dh * w * 0.01;
-      if (isWarm) {
-        nr += hueAmt * 38;
-        nb -= hueAmt * 38;
-      } else {
-        nr -= hueAmt * 38;
-        nb += hueAmt * 38;
-      }
-      const Lv = 0.2126 * nr + 0.7152 * ng + 0.0722 * nb;
-      const sm = 1 + (ds / 100) * w * 0.55;
-      nr = Lv + (nr - Lv) * sm;
-      ng = Lv + (ng - Lv) * sm;
-      nb = Lv + (nb - Lv) * sm;
-    }
-    return [clamp(nr, 0, 255), clamp(ng, 0, 255), clamp(nb, 0, 255)];
-  };
-
-  // 分离色调：高光/阴影染色
-  const applySplitTint = (r, g, b) => {
-    if (!p.splitStrength) return [r, g, b];
-    const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const w = (p.splitStrength / 100) * 0.24;
-    const hiW = Math.max(0, L / 255 - 0.45) * 1.8 * w;
-    const shW = Math.max(0, 0.55 - L / 255) * 1.8 * w;
-    let nr = r, ng = g, nb = b;
-    if (p.splitHue) {
-      const a = (p.splitHue - 40) / 180;
-      nr += hiW * (a > 0 ? 55 : 8) * (a > 0 ? 1 : -0.2);
-      ng += hiW * (a > 0 ? 18 : 6);
-      nb += hiW * (a > 0 ? -35 : 60);
-    }
-    if (p.splitHueShadow) {
-      const a = (p.splitHueShadow - 200) / 180;
-      nr += shW * (a > 0 ? -18 : 28);
-      ng += shW * 6;
-      nb += shW * (a > 0 ? 58 : -12);
-    }
-    return [clamp(nr, 0, 255), clamp(ng, 0, 255), clamp(nb, 0, 255)];
-  };
-
-  for (let i = 0; i < d.length; i += 4) {
-    let r = d[i] * evMul * rGain;
-    let g = d[i + 1] * evMul * gGain;
-    let b = d[i + 2] * evMul * bGain;
-
-    // 亮度
-    let L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-    // highlights / shadows / whites / blacks
-    const ln = L / 255;
-    if (hi !== 0 && ln > 0.55) {
-      const k = hi * 0.55 * ((ln - 0.55) / 0.45);
-      const f = 1 + k;
-      r *= f; g *= f; b *= f;
-      L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    }
-    if (sh !== 0 && ln < 0.5) {
-      const k = sh * 0.7 * (1 - ln / 0.5);
-      const f = 1 + k;
-      r *= f; g *= f; b *= f;
-      L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    }
-    if (wh !== 0) {
-      const f = 1 + wh * 0.25 * Math.max(0, ln - 0.4);
-      r *= f; g *= f; b *= f;
-    }
-    if (bl !== 0) {
-      const f = 1 + bl * 0.4 * Math.max(0, 0.45 - ln);
-      r *= f; g *= f; b *= f;
-    }
-
-    // contrast & clarity & tone curve on luminance
-    L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const Lc = contrastCurve(L);
-    const Lcl = clarityCurve(Lc);
-    const Lcur = applyCurve(Lcl);
-    if (L > 1) {
-      const scale = Lcur / L;
-      r *= scale; g *= scale; b *= scale;
-    }
-
-    // saturation / vibrance
-    L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const maxC = Math.max(r, g, b);
-    const minC = Math.min(r, g, b);
-    const satLevel = maxC === 0 ? 0 : (maxC - minC) / maxC;
-    let satMul = sat;
-    if (vib !== 0) {
-      // vibrance：低饱和区提升更多
-      satMul += vib * (1 - satLevel) * 0.9;
-    }
-    r = L + (r - L) * satMul;
-    g = L + (g - L) * satMul;
-    b = L + (b - L) * satMul;
-
-    // HSL family
-    [r, g, b] = applyFamily(r, g, b);
-
-    // split tone
-    [r, g, b] = applySplitTint(r, g, b);
-
-    // fade
-    r = fadeCurve(r);
-    g = fadeCurve(g);
-    b = fadeCurve(b);
-
-    d[i] = clamp(r, 0, 255);
-    d[i + 1] = clamp(g, 0, 255);
-    d[i + 2] = clamp(b, 0, 255);
+  // 对比 / 清晰度 / 色调曲线都是亮度的值函数 → 合成一张 256 项查找表
+  const hasTone =
+    contrast !== 0 || clarity !== 0 ||
+    p.curveShadows !== 0 || p.curveMids !== 0 || p.curveHighlights !== 0;
+  let toneLUT = null;
+  if (hasTone) {
+    toneLUT = new Float64Array(256);
+    for (let v = 0; v < 256; v++) toneLUT[v] = applyCurve(clarityCurve(contrastCurve(v)));
   }
 
-  // 暗角
-  if (p.vignette > 0) {
-    const amount = p.vignette / 100;
-    const cx = w / 2;
-    const cy = h / 2;
-    const maxD = Math.sqrt(cx * cx + cy * cy);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const dx = (x - cx) / maxD;
-        const dy = (y - cy) / maxD;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const v = 1 - amount * Math.pow(Math.min(1, dist * 1.15), 2.2);
-        const i = (y * w + x) * 4;
-        d[i] *= v;
-        d[i + 1] *= v;
-        d[i + 2] *= v;
-      }
+  // 褪色按通道值函数 → 256 项查找表
+  let fadeLUT = null;
+  if (hasFade) {
+    fadeLUT = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) {
+      const x = v / 255;
+      fadeLUT[v] = fade * 0.18 + x * (1 - fade * 0.28);
     }
   }
 
-  // 光晕 Halation：高光外圈暖红（CineStill 类）
+  // 暗角参数
+  const hasVignette = p.vignette > 0;
+  const vigAmount = p.vignette / 100;
+  const vigCx = w / 2;
+  const vigCy = h / 2;
+  const vigMaxD = Math.sqrt(vigCx * vigCx + vigCy * vigCy);
+
+  // 颗粒
+  const hasGrain = p.grain > 0;
+  const grainStrength = p.grain / 100;
+
+  // 光晕：1/4 分辨率掩膜，主循环前一次性算好
+  let halMask = null;
+  let halSw = 0;
+  let halSh = 0;
+  const halAmt = p.halation / 100;
   if (p.halation > 0) {
-    const amt = p.halation / 100;
-    const sw = Math.max(8, w >> 2);
-    const sh = Math.max(8, h >> 2);
-    const mask = new Float32Array(sw * sh);
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        const sx = Math.min(w - 1, (x * w) / sw | 0);
-        const sy = Math.min(h - 1, (y * h) / sh | 0);
+    halSw = Math.max(8, w >> 2);
+    halSh = Math.max(8, h >> 2);
+    halMask = new Float32Array(halSw * halSh);
+    for (let y = 0; y < halSh; y++) {
+      for (let x = 0; x < halSw; x++) {
+        const sx = Math.min(w - 1, (x * w) / halSw | 0);
+        const sy = Math.min(h - 1, (y * h) / halSh | 0);
         const i = (sy * w + sx) * 4;
         const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-        mask[y * sw + x] = L > 200 ? (L - 200) / 55 : 0;
+        halMask[y * halSw + x] = L > 200 ? (L - 200) / 55 : 0;
       }
     }
-    // 可分离盒模糊 ×2
     const blur = (arr, ww, hh, r) => {
       const tmp = new Float32Array(arr.length);
       for (let y = 0; y < hh; y++) {
@@ -404,47 +350,532 @@ function applyGrade(srcCanvas, params) {
         }
       }
     };
-    const r = Math.max(2, (Math.min(sw, sh) / 18) | 0);
-    blur(mask, sw, sh, r);
-    blur(mask, sw, sh, r);
+    const br = Math.max(2, (Math.min(halSw, halSh) / 18) | 0);
+    blur(halMask, halSw, halSh, br);
+    blur(halMask, halSw, halSh, br);
+  }
+  const hasHalation = !!halMask;
 
-    for (let y = 0; y < h; y++) {
-      const my = Math.min(sh - 1, ((y * sh) / h) | 0);
-      for (let x = 0; x < w; x++) {
-        const mx = Math.min(sw - 1, ((x * sw) / w) | 0);
-        const m = mask[my * sw + mx] * amt;
-        if (m < 0.01) continue;
-        const i = (y * w + x) * 4;
-        d[i] = clamp(d[i] + m * 95, 0, 255);
-        d[i + 1] = clamp(d[i + 1] + m * 28, 0, 255);
-        d[i + 2] = clamp(d[i + 2] + m * 12, 0, 255);
+  /** 主调色：处理行带 [y0, y1) */
+  function gradeRows(y0, y1) {
+    const wm1 = Math.max(1, w - 1);
+    for (let y = y0; y < y1; y++) {
+      let i = y * w * 4;
+      for (let x = 0; x < w; x++, i += 4) {
+        let r = d[i] * evMul * rGain;
+        let g = d[i + 1] * evMul * gGain;
+        let b = d[i + 2] * evMul * bGain;
+
+        let L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        const ln = L / 255;
+
+        // highlights / shadows / whites / blacks
+        if (hiOn && ln > 0.55) {
+          const f = 1 + hi * 0.55 * ((ln - 0.55) / 0.45);
+          r *= f; g *= f; b *= f;
+        }
+        if (shOn && ln < 0.5) {
+          const f = 1 + sh * 0.7 * (1 - ln / 0.5);
+          r *= f; g *= f; b *= f;
+        }
+        if (whOn) {
+          const f = 1 + wh * 0.25 * Math.max(0, ln - 0.4);
+          r *= f; g *= f; b *= f;
+        }
+        if (blOn) {
+          const f = 1 + bl * 0.4 * Math.max(0, 0.45 - ln);
+          r *= f; g *= f; b *= f;
+        }
+
+        // contrast & clarity & tone curve on luminance（查表）
+        if (hasTone) {
+          L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          if (L > 0.0001) {
+            const Lcur = toneLUT[L > 255 ? 255 : L < 0 ? 0 : L | 0];
+            const scale = Lcur / L;
+            r *= scale; g *= scale; b *= scale;
+          }
+        }
+
+        // saturation / vibrance
+        if (hasSat) {
+          L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          const maxC = r > g ? (r > b ? r : b) : g > b ? g : b;
+          const minC = r < g ? (r < b ? r : b) : g < b ? g : b;
+          const satLevel = maxC === 0 ? 0 : (maxC - minC) / maxC;
+          let satMul = sat;
+          if (vib !== 0) satMul += vib * (1 - satLevel) * 0.9; // vibrance：低饱和区提升更多
+          r = L + (r - L) * satMul;
+          g = L + (g - L) * satMul;
+          b = L + (b - L) * satMul;
+        }
+
+        // HSL family（主族 + 相邻族，按原 red→…→blue 次序累计）
+        if (hasHSL) {
+          const mx = r > g ? (r > b ? r : b) : g > b ? g : b;
+          const mn = r < g ? (r < b ? r : b) : g < b ? g : b;
+          const dlt = mx - mn;
+          if (dlt >= 10) {
+            let nr = r, ng = g, nb = b;
+            if (mx === r) {
+              const wR = (g >= b ? (g - b) / dlt : 1);
+              const wO = g > b ? (g - b) / dlt : 0;
+              if (wR > 0.02 && (p.hueRed || p.satRed)) {
+                hslKnob(nr, ng, nb, p.hueRed, p.satRed, Math.min(1, wR), true);
+                nr = _hslOut[0]; ng = _hslOut[1]; nb = _hslOut[2];
+              }
+              if (wO > 0.02 && (p.hueOrange || p.satOrange)) {
+                hslKnob(nr, ng, nb, p.hueOrange, p.satOrange, Math.min(1, wO), true);
+                nr = _hslOut[0]; ng = _hslOut[1]; nb = _hslOut[2];
+              }
+            } else if (mx === g) {
+              const wY = r > b ? (r - b) / dlt : 0;
+              const wG = Math.min(1, (b - r) / dlt + 1);
+              if (wY > 0.02 && (p.hueYellow || p.satYellow)) {
+                hslKnob(nr, ng, nb, p.hueYellow, p.satYellow, Math.min(1, wY), true);
+                nr = _hslOut[0]; ng = _hslOut[1]; nb = _hslOut[2];
+              }
+              if (wG > 0.02 && (p.hueGreen || p.satGreen)) {
+                hslKnob(nr, ng, nb, p.hueGreen, p.satGreen, wG, false);
+                nr = _hslOut[0]; ng = _hslOut[1]; nb = _hslOut[2];
+              }
+            } else {
+              const wB = Math.min(1, (r - g) / dlt + 1);
+              const wA = g > r ? (g - r) / dlt : 0;
+              if (wA > 0.02 && (p.hueAqua || p.satAqua)) {
+                hslKnob(nr, ng, nb, p.hueAqua, p.satAqua, Math.min(1, wA), false);
+                nr = _hslOut[0]; ng = _hslOut[1]; nb = _hslOut[2];
+              }
+              if (wB > 0.02 && (p.hueBlue || p.satBlue)) {
+                hslKnob(nr, ng, nb, p.hueBlue, p.satBlue, wB, false);
+                nr = _hslOut[0]; ng = _hslOut[1]; nb = _hslOut[2];
+              }
+            }
+            r = clamp(nr, 0, 255);
+            g = clamp(ng, 0, 255);
+            b = clamp(nb, 0, 255);
+          }
+        }
+
+        // 分离色调：高光/阴影染色
+        if (hasSplit) {
+          const Ls = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          const wS = (p.splitStrength / 100) * 0.24;
+          const hiW = Math.max(0, Ls / 255 - 0.45) * 1.8 * wS;
+          const shW = Math.max(0, 0.55 - Ls / 255) * 1.8 * wS;
+          if (p.splitHue) {
+            const a = (p.splitHue - 40) / 180;
+            r += hiW * (a > 0 ? 55 : 8) * (a > 0 ? 1 : -0.2);
+            g += hiW * (a > 0 ? 18 : 6);
+            b += hiW * (a > 0 ? -35 : 60);
+          }
+          if (p.splitHueShadow) {
+            const a = (p.splitHueShadow - 200) / 180;
+            r += shW * (a > 0 ? -18 : 28);
+            g += shW * 6;
+            b += shW * (a > 0 ? 58 : -12);
+          }
+          r = clamp(r, 0, 255);
+          g = clamp(g, 0, 255);
+          b = clamp(b, 0, 255);
+        }
+
+        // fade
+        if (hasFade) {
+          r = fadeLUT[r > 255 ? 255 : r < 0 ? 0 : r | 0];
+          g = fadeLUT[g > 255 ? 255 : g < 0 ? 0 : g | 0];
+          b = fadeLUT[b > 255 ? 255 : b < 0 ? 0 : b | 0];
+        }
+
+        d[i] = r; // Uint8ClampedArray 写入自动钳制
+        d[i + 1] = g;
+        d[i + 2] = b;
       }
     }
   }
 
-  // 颗粒 Grain
-  if (p.grain > 0) {
-    const strength = p.grain / 100;
-    for (let i = 0; i < d.length; i += 4) {
-      const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-      // 中间调颗粒更明显
-      const lumW = 1 - Math.abs(L / 255 - 0.5) * 1.2;
-      const n = (Math.random() - 0.5) * strength * 42 * Math.max(0.15, lumW);
-      d[i] = clamp(d[i] + n, 0, 255);
-      d[i + 1] = clamp(d[i + 1] + n * 0.95, 0, 255);
-      d[i + 2] = clamp(d[i + 2] + n * 0.9, 0, 255);
+  /** 后期效果（暗角 / 光晕 / 颗粒）行带 [y0, y1) */
+  function postRows(y0, y1) {
+    if (hasVignette) {
+      for (let y = y0; y < y1; y++) {
+        const dy = (y - vigCy) / vigMaxD;
+        for (let x = 0; x < w; x++) {
+          const dx = (x - vigCx) / vigMaxD;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const v = 1 - vigAmount * Math.pow(Math.min(1, dist * 1.15), 2.2);
+          const i = (y * w + x) * 4;
+          d[i] *= v;
+          d[i + 1] *= v;
+          d[i + 2] *= v;
+        }
+      }
+    }
+    if (hasHalation) {
+      for (let y = y0; y < y1; y++) {
+        const my = Math.min(halSh - 1, ((y * halSh) / h) | 0);
+        for (let x = 0; x < w; x++) {
+          const mx = Math.min(halSw - 1, ((x * halSw) / w) | 0);
+          const m = halMask[my * halSw + mx] * halAmt;
+          if (m < 0.01) continue;
+          const i = (y * w + x) * 4;
+          d[i] = clamp(d[i] + m * 95, 0, 255);
+          d[i + 1] = clamp(d[i + 1] + m * 28, 0, 255);
+          d[i + 2] = clamp(d[i + 2] + m * 12, 0, 255);
+        }
+      }
+    }
+    if (hasGrain) {
+      for (let y = y0; y < y1; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          const lumW = 1 - Math.abs(L / 255 - 0.5) * 1.2;
+          // xorshift-ish hash（坐标定值，保证预览与导出一致）
+          let n = (x * 374761393 + y * 668265263) | 0;
+          n = (n ^ (n >>> 13)) * 1274126177;
+          n = (n ^ (n >>> 16)) >>> 0;
+          const rnd = (n % 2000) / 2000 - 0.5;
+          const noise = rnd * grainStrength * 42 * Math.max(0.15, lumW);
+          d[i] += noise;
+          d[i + 1] += noise * 0.95;
+          d[i + 2] += noise * 0.9;
+        }
+      }
     }
   }
 
-  ctx.putImageData(imgData, 0, 0);
-  return out;
+  return {
+    out, ctx, w, h, gradeRows, postRows,
+    hasPost: hasVignette || hasHalation || hasGrain,
+    finish: () => ctx.putImageData(imgData, 0, 0),
+  };
+}
+
+const yieldToUI = () =>
+  new Promise((resolve) => {
+    if (typeof MessageChannel !== "undefined") {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = () => resolve();
+      ch.port2.postMessage(0);
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
+
+/** 同步调色（预览用，≤1600px） */
+function applyGrade(srcCanvas, params) {
+  const s = buildGradeSession(srcCanvas, params);
+  s.gradeRows(0, s.h);
+  s.postRows(0, s.h);
+  s.finish();
+  return s.out;
+}
+
+/** 分块调色（全尺寸导出用）：按行带让出主线程，onProgress 0..1 */
+async function applyGradeAsync(srcCanvas, params, onProgress) {
+  const s = buildGradeSession(srcCanvas, params);
+  const units = (s.hasPost ? 2 : 1) * Math.ceil(s.h / 32) || 1;
+  let done = 0;
+  const step = Math.max(8, Math.ceil(s.h / 32));
+  for (let y = 0; y < s.h; y += step) {
+    s.gradeRows(y, Math.min(s.h, y + step));
+    onProgress?.(++done / units);
+    if (y + step < s.h) await yieldToUI();
+  }
+  if (s.hasPost) {
+    for (let y = 0; y < s.h; y += step) {
+      s.postRows(y, Math.min(s.h, y + step));
+      onProgress?.(++done / units);
+      if (y + step < s.h) await yieldToUI();
+    }
+  }
+  s.finish();
+  return s.out;
 }
 
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-/* ========== 自动校正（基于直方图） ========== */
+/* ========== 局部蒙版（径向 / 渐变） ========== */
+const MASK_DEFAULT = {
+  exposure: 0,
+  contrast: 0,
+  highlights: 0,
+  shadows: 0,
+  temp: 0,
+  tint: 0,
+  saturation: 0,
+  clarity: 0,
+  brightness: 0, // -100..100 简单提亮压暗
+};
+
+function createRadialMask() {
+  return {
+    id: "m" + Date.now().toString(36),
+    type: "radial",
+    x: 0.5,
+    y: 0.5,
+    rx: 0.28,
+    ry: 0.36,
+    feather: 0.45, // 0..1
+    invert: false,
+    params: { ...MASK_DEFAULT },
+  };
+}
+
+function createGradMask() {
+  return {
+    id: "m" + Date.now().toString(36) + "g",
+    type: "grad",
+    x: 0.5,
+    y: 0.72,
+    angle: 0, // 0 = 上下渐变
+    length: 0.55,
+    feather: 0.35,
+    invert: false,
+    params: { ...MASK_DEFAULT },
+  };
+}
+
+function maskAlpha(mask, nx, ny) {
+  // nx, ny in 0..1
+  if (mask.type === "radial") {
+    const dx = (nx - mask.x) / Math.max(0.02, mask.rx);
+    const dy = (ny - mask.y) / Math.max(0.02, mask.ry);
+    const d = Math.sqrt(dx * dx + dy * dy); // 0 center, 1 edge
+    const inner = 1 - clamp(mask.feather, 0, 0.95);
+    let a = 1;
+    if (d > inner) {
+      a = 1 - (d - inner) / Math.max(0.05, 1 - inner);
+    }
+    a = clamp(a, 0, 1);
+    return mask.invert ? 1 - a : a;
+  }
+  // graduated
+  // 约定：angle 0 = 上下渐变（上方保留效果、向下淡出），顺时针增大；90° = 左右渐变。
+  // length = 中心到完全无效的距离（半幅）；feather = 过渡带占全幅 (2×length) 的比例：
+  // 0 = 在 length 处硬切，1 = 全程平滑过渡。此前 feather 只挪动起点、几乎不起作用，且
+  // 注释与实现方向矛盾，现统一为一套语义，辅助线（drawMaskOverlay）同步。
+  const ang = (mask.angle * Math.PI) / 180;
+  const gx = Math.sin(ang);
+  const gy = Math.cos(ang);
+  const px = nx - mask.x;
+  const py = ny - mask.y;
+  const t = px * gx + py * gy;
+  const len = Math.max(0.05, mask.length);
+  const band = 2 * len * clamp(mask.feather, 0, 1);
+  const a0 = len - band; // 过渡带起点（t <= a0 全效果，t >= len 无效果）
+  let a;
+  if (t <= a0) a = 1;
+  else if (t >= len) a = 0;
+  else {
+    const s = (t - a0) / Math.max(0.001, len - a0);
+    a = 1 - s * s * (3 - 2 * s);
+  }
+  return mask.invert ? 1 - a : a;
+}
+
+/** 带局部蒙版的调色：先全局，再逐像素叠加 mask 参数 */
+function applyGradeWithMasks(srcCanvas, globalParams, masks) {
+  const out = applyGrade(srcCanvas, globalParams);
+  if (!masks || !masks.length) return out;
+  const ctx = out.getContext("2d");
+  const w = out.width;
+  const h = out.height;
+  const img = ctx.getImageData(0, 0, w, h);
+  applyMaskBands(img, masks, w, h, 0, h);
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+/** 分块版（全尺寸导出用）：onProgress 0..1，全局调色占 70%，蒙版占 30% */
+async function applyGradeWithMasksAsync(srcCanvas, globalParams, masks, onProgress) {
+  const out = await applyGradeAsync(srcCanvas, globalParams, (p) => onProgress?.(p * 0.7));
+  if (!masks || !masks.length) {
+    onProgress?.(1);
+    return out;
+  }
+  const ctx = out.getContext("2d");
+  const w = out.width;
+  const h = out.height;
+  const img = ctx.getImageData(0, 0, w, h);
+  const step = Math.max(8, Math.ceil(h / 20));
+  let done = 0;
+  const units = Math.ceil(h / step);
+  for (let y = 0; y < h; y += step) {
+    applyMaskBands(img, masks, w, h, y, Math.min(h, y + step));
+    onProgress?.(0.7 + 0.3 * (++done / units));
+    if (y + step < h) await yieldToUI();
+  }
+  ctx.putImageData(img, 0, 0);
+  onProgress?.(1);
+  return out;
+}
+
+/** 蒙版参数 → 行带 [y0,y1) 像素叠加（热循环零分配，参数外提） */
+function applyMaskBands(imgData, masks, w, h, y0, y1) {
+  const d = imgData.data;
+  const wm1 = Math.max(1, w - 1);
+  const hm1 = Math.max(1, h - 1);
+  for (const mask of masks) {
+    const mp = mask.params || {};
+    const bright = (mp.brightness || 0) / 100;
+    const ev = Math.pow(2, (mp.exposure || 0) * 0.5);
+    const t = (mp.temp || 0) / 100;
+    const ti = (mp.tint || 0) / 100;
+    const con = (mp.contrast || 0) / 100;
+    const sat = 1 + (mp.saturation || 0) / 100;
+    const mHi = (mp.highlights || 0) / 100;
+    const mSh = (mp.shadows || 0) / 100;
+    const mCl = (mp.clarity || 0) / 100;
+    const empty = Object.keys(mp).every((k) => !mp[k]);
+    if (empty) continue;
+    const hasBright = bright !== 0;
+    const hasEv = ev !== 1;
+    const hasWb = t !== 0 || ti !== 0;
+    const hasHi = mHi !== 0;
+    const hasSh = mSh !== 0;
+    const hasClarity = mCl !== 0;
+    const hasCon = con !== 0;
+    const hasSat = sat !== 1;
+    if (!hasBright && !hasEv && !hasWb && !hasHi && !hasSh && !hasClarity && !hasCon && !hasSat) continue;
+    for (let y = y0; y < y1; y++) {
+      const ny = y / hm1;
+      for (let x = 0; x < w; x++) {
+        const a = maskAlpha(mask, x / wm1, ny);
+        if (a < 0.01) continue;
+        const i = (y * w + x) * 4;
+        let r = d[i], g = d[i + 1], b = d[i + 2];
+        if (hasBright) {
+          r += bright * 55; g += bright * 55; b += bright * 55;
+        }
+        if (hasEv) {
+          r *= ev; g *= ev; b *= ev;
+        }
+        if (hasWb) {
+          r *= 1 + t * 0.22 + ti * 0.05;
+          g *= 1 - ti * 0.08;
+          b *= 1 - t * 0.22 + ti * 0.04;
+        }
+        // highlights / shadows：按亮度区间乘性增减（与全局版同式）
+        if (hasHi || hasSh) {
+          const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          const ln = L / 255;
+          if (hasHi && ln > 0.55) {
+            const f = 1 + mHi * 0.55 * ((ln - 0.55) / 0.45);
+            r *= f; g *= f; b *= f;
+          }
+          if (hasSh && ln < 0.5) {
+            const f = 1 + mSh * 0.7 * (1 - ln / 0.5);
+            r *= f; g *= f; b *= f;
+          }
+        }
+        // clarity：亮度域 S 曲线近似局部对比（与全局版同式）
+        if (hasClarity) {
+          const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          if (L > 0.0001) {
+            const xx = clamp(L, 0, 255) / 255;
+            const k = mCl * 0.35;
+            const yy = xx + k * (xx - 0.5) * (1 - Math.abs(xx - 0.5) * 2);
+            const scale = clamp(yy * 255, 0, 255) / L;
+            r *= scale; g *= scale; b *= scale;
+          }
+        }
+        if (hasCon) {
+          const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          const k = 1 + con * 0.7;
+          r = L + (r - L) * k;
+          g = L + (g - L) * k;
+          b = L + (b - L) * k;
+        }
+        if (hasSat) {
+          const L2 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          r = L2 + (r - L2) * sat;
+          g = L2 + (g - L2) * sat;
+          b = L2 + (b - L2) * sat;
+        }
+        const r2 = clamp(r, 0, 255);
+        const g2 = clamp(g, 0, 255);
+        const b2 = clamp(b, 0, 255);
+        d[i] = r + (r2 - r) * a;
+        d[i + 1] = g + (g2 - g) * a;
+        d[i + 2] = b + (b2 - b) * a;
+      }
+    }
+  }
+}
+
+/** 画蒙版辅助线（选中时） */
+function drawMaskOverlay(canvas, mask, active) {
+  if (!mask) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.save();
+  ctx.strokeStyle = active ? "rgba(212,160,84,0.95)" : "rgba(212,160,84,0.35)";
+  ctx.lineWidth = 2;
+  if (mask.type === "radial") {
+    ctx.beginPath();
+    ctx.ellipse(mask.x * w, mask.y * h, mask.rx * w, mask.ry * h, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(
+      mask.x * w,
+      mask.y * h,
+      mask.rx * w * (1 - mask.feather * 0.5),
+      mask.ry * h * (1 - mask.feather * 0.5),
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.setLineDash([6, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(mask.x * w, mask.y * h, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(212,160,84,0.9)";
+    ctx.fill();
+  } else {
+    // 渐变辅助线：实线 = 过渡带中点（半效果处），虚线 = 全效果边界。
+    // 与 maskAlpha 同一坐标系：渐变方向 d=(sin,cos)，等值线沿垂直方向 u=(cos,-sin)。
+    const ang = (mask.angle * Math.PI) / 180;
+    const cx = mask.x * w;
+    const cy = mask.y * h;
+    const dx = Math.sin(ang);
+    const dy = Math.cos(ang);
+    const ux = Math.cos(ang);
+    const uy = -Math.sin(ang);
+    const len = Math.max(0.05, mask.length);
+    const band = 2 * len * clamp(mask.feather, 0, 1);
+    const a0 = len - band;
+    const tm = (a0 + len) / 2; // 过渡带中点
+    const span = Math.max(w, h) * 1.5;
+    const line = (t, dash) => {
+      const bx = cx + dx * t * w;
+      const by = cy + dy * t * h;
+      ctx.setLineDash(dash ? [8, 8] : []);
+      ctx.beginPath();
+      ctx.moveTo(bx - ux * span, by - uy * span);
+      ctx.lineTo(bx + ux * span, by + uy * span);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    line(tm, false);
+    line(a0, true);
+    // 方向小箭头：指向效果淡出的一侧
+    const ax = cx + dx * tm * w;
+    const ay = cy + dy * tm * h;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax + dx * 14 - ux * 6, ay + dy * 14 - uy * 6);
+    ctx.lineTo(ax + dx * 14 + ux * 6, ay + dy * 14 + uy * 6);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(212,160,84,0.9)";
+    ctx.fill();
+  }
+  ctx.restore();
+}
 function autoGradeFromHistogram(hist, meta) {
   const params = { ...DEFAULT_GRADE };
   const mean = (meta.meanL || 128) / 255;
@@ -576,6 +1007,11 @@ function llmConfigReady() {
 
 /** 通用 LLM 视觉调用：system + userText + image */
 async function callLLMVision({ system, userText, canvas, maxTokens = 1200 }) {
+  return callLLMVisionN({ system, userText, canvases: canvas ? [canvas] : [], maxTokens });
+}
+
+/** 多图版：作业点评等场景一次看多张 */
+async function callLLMVisionN({ system, userText, canvases = [], maxTokens = 1200 }) {
   const cfg = loadLLMConfig();
   if (!cfg.vendorId || !cfg.apiKey) {
     throw new Error("尚未配置大模型。请在调色工作台「厂商设置」里填写厂商与 API Key。");
@@ -586,56 +1022,62 @@ async function callLLMVision({ system, userText, canvas, maxTokens = 1200 }) {
   if (!baseUrl) throw new Error("请填写 API Base URL");
   if (!model) throw new Error("请填写模型名称");
 
-  const thumb = canvasToThumbBase64(canvas, 640);
+  const thumbs = canvases.map((c) => canvasToThumbBase64(c, 640));
+  const anthropicParts = [
+    ...thumbs.map((t) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: t } })),
+    { type: "text", text: userText },
+  ];
+  const openaiParts = [
+    { type: "text", text: userText },
+    ...thumbs.map((t) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${t}` } })),
+  ];
 
   let res;
-  if (vendor.id === "anthropic") {
-    res = await fetch(`${baseUrl}/messages`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": cfg.apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: thumb } },
-              { type: "text", text: userText },
-            ],
-          },
-        ],
-      }),
-    });
-  } else {
-    res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        temperature: 0.5,
-        messages: [
-          { role: "system", content: system },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: userText },
-              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${thumb}` } },
-            ],
-          },
-        ],
-      }),
-    });
+  try {
+    if (vendor.id === "anthropic") {
+      res = await fetch(`${baseUrl}/messages`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": cfg.apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        signal: AbortSignal.timeout(90000),
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          system,
+          messages: [{ role: "user", content: anthropicParts }],
+        }),
+      });
+    } else {
+      res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${cfg.apiKey}`,
+        },
+        signal: AbortSignal.timeout(90000),
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          temperature: 0.5,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: openaiParts },
+          ],
+        }),
+      });
+    }
+  } catch (e) {
+    if (e && (e.name === "TimeoutError" || /timeout|timed out/i.test(e.message || ""))) {
+      throw new Error("请求超时（90 秒）。请检查网络，或减少图片数量后重试。");
+    }
+    if ((e.message || "") === "Failed to fetch") {
+      throw new Error("网络请求失败：多为该厂商 API 不允许浏览器直连（CORS 限制）或网络不通。可换支持 CORS 的厂商/中转地址。");
+    }
+    throw e;
   }
 
   if (!res.ok) {
@@ -727,13 +1169,6 @@ async function askLLMGrade(canvas, userIntent, meta) {
   if (!cfg.vendorId || !cfg.apiKey) {
     throw new Error("尚未配置大模型。请在「AI 调色」面板填写厂商与 API Key。");
   }
-  const vendor = LLM_VENDORS.find((v) => v.id === cfg.vendorId) || LLM_VENDORS[0];
-  const baseUrl = (cfg.baseUrl || vendor.baseUrl || "").replace(/\/$/, "");
-  const model = cfg.model || vendor.models[0];
-  if (!baseUrl) throw new Error("请填写 API Base URL");
-  if (!model) throw new Error("请填写模型名称");
-
-  const thumb = canvasToThumbBase64(canvas, 512);
 
   const system = `你是专业摄影调色师。根据用户想要的效果，给出 Lightroom 风格调色参数。
 只输出 JSON，不要 markdown，格式：
@@ -745,73 +1180,8 @@ async function askLLMGrade(canvas, userIntent, meta) {
 画面信息：均值亮度 ${meta.meanL}，对比 ${meta.contrast}，动态范围 ${meta.dynamicRange}，饱和度 ${meta.sat}，色温倾向 ${meta.warmth}
 请给出调色参数 JSON。`;
 
-  // OpenAI 兼容 / Anthropic 两套
-  let res;
-  if (vendor.id === "anthropic") {
-    res = await fetch(`${baseUrl}/messages`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": cfg.apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 800,
-        system,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: thumb } },
-              { type: "text", text: userText },
-            ],
-          },
-        ],
-      }),
-    });
-  } else {
-    res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 800,
-        temperature: 0.4,
-        messages: [
-          { role: "system", content: system },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: userText },
-              {
-                type: "image_url",
-                image_url: { url: `data:image/jpeg;base64,${thumb}` },
-              },
-            ],
-          },
-        ],
-      }),
-    });
-  }
-
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${t.slice(0, 180) || "请求失败"}`);
-  }
-
-  const data = await res.json();
-  let content;
-  if (vendor.id === "anthropic") {
-    content = data.content && data.content[0] && data.content[0].text;
-  } else {
-    content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-  }
-  if (!content) throw new Error("模型没有返回内容");
+  // 统一走 callLLMVisionN（自带超时 / CORS 友好提示）
+  const { content, vendor, model } = await callLLMVisionN({ system, userText, canvas, maxTokens: 800 });
 
   // 提取 JSON
   const jsonMatch = content.match(/\{[\s\S]*\}/);
