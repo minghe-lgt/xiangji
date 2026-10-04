@@ -1,4 +1,3 @@
-<!-- AI生成 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -12,8 +11,6 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<p data-aigc-mark="1" style="margin:0 0 8px;font-size:10px;line-height:1.3;color:#6b6560;font-weight:400;">AI生成</p>
-
   <div class="grain" aria-hidden="true"></div>
 
   <div class="app-shell">
@@ -289,6 +286,7 @@
           <button class="btn btn-ghost" id="hwCloseBtn" type="button" aria-label="关闭">关闭</button>
         </header>
         <div class="assess-modal-body">
+          <div class="hw-brief hidden" id="hwBrief"></div>
           <div class="assess-photo-row" id="hwDrop">
             <input type="file" id="hwFiles" accept="image/*" multiple hidden />
             <button class="btn btn-secondary" id="hwPickBtn" type="button">选择照片（1–5 张）</button>
@@ -454,6 +452,7 @@
     <section class="section section-alt" id="library" data-group="learn">
       <div class="section-kicker"><span class="kicker-num">09</span><div><p class="eyebrow">READING</p><h2 class="kicker-title">书单课单</h2></div><p class="kicker-desc">经典教材与系统课，先地基后风格。</p></div>
       <div class="library-list" id="libraryList"></div>
+      <p class="lib-copyright-note">本页仅作延伸阅读推荐，不包含任何书中内容；各周卡片里的「读时抓重点」均为本站原创提炼。请通过正规渠道购买或借阅原书。</p>
     </section>
 
     <!-- Progress -->
