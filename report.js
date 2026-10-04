@@ -62,10 +62,13 @@ function computeLearningReport() {
     photoStats,
     ability,
     doneTitles,
+    trend,
     nextWeek: next
       ? { week: next.week, title: next.title, stage: next.stage }
       : null,
     baseline,
+    attemptsCount: attempts.length,
+    lastLevel: attempts[0]?.level ?? null,
     journalSample: journal.slice(0, 8),
   };
 }
@@ -146,8 +149,8 @@ function renderLearningReport(container, data) {
       <div class="lr-section">
         <h4>能力测验趋势</h4>
         <ul class="lr-list">
-          <li>${trend || "还没有测验记录。到「能力诊断」做一次 18 题测验。"}</li>
-          ${attempts.length ? `<li>共 ${attempts.length} 次 · 最近等级 ${attempts[0].level}</li>` : ""}
+          <li>${data.trend || "还没有测验记录。到「能力诊断」做一次诊断。"}</li>
+          ${data.attemptsCount ? `<li>共 ${data.attemptsCount} 次 · 最近等级 ${data.lastLevel}</li>` : ""}
         </ul>
       </div>
 

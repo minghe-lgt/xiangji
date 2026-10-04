@@ -3366,6 +3366,73 @@ body.mode-tool [data-group="learn"] {
   flex-wrap: wrap;
 }
 
+/* 读时抓重点 / 书单配套周次 / 作业要点 */
+.read-points-label {
+  font-size: 0.78rem;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  margin: 10px 0 6px;
+}
+
+.read-points {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: var(--ink-dim);
+}
+
+.lib-weeks {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: rgba(212, 160, 84, 0.08);
+  border: 1px solid rgba(212, 160, 84, 0.25);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.lib-copyright-note {
+  margin-top: 18px;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  opacity: 0.75;
+  line-height: 1.6;
+}
+
+.hw-brief {
+  background: rgba(212, 160, 84, 0.06);
+  border: 1px solid rgba(212, 160, 84, 0.22);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.86rem;
+  line-height: 1.7;
+}
+
+.hw-brief-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.hw-brief-row + .hw-brief-row {
+  margin-top: 8px;
+}
+
+.hw-brief-row strong {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.hw-brief-row ul {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--ink-dim);
+}
+
 .hw-report {
   background: var(--paper);
   color: #2a241c;
@@ -3911,6 +3978,14 @@ body.mode-tool [data-group="learn"] {
   letter-spacing: 0.08em;
   opacity: 0.7;
   white-space: nowrap;
+}
+
+/* 窄屏允许换行，避免页脚把页面撑出横向滚动 */
+@media (max-width: 700px) {
+  .footer-note {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* ========== Responsive ========== */

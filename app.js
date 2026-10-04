@@ -146,8 +146,13 @@ function weekCard(item) {
             : ""
         }
         <div class="detail-block reading">
-          <div class="label">推荐阅读</div>
+          <div class="label">延伸阅读 · 读什么</div>
           <p>${item.reading}</p>
+          ${
+            item.readPoints?.length
+              ? `<div class="read-points-label">读时抓重点（本站原创提炼）</div><ul class="read-points">${item.readPoints.map((t) => `<li>${t}</li>`).join("")}</ul>`
+              : ""
+          }
         </div>
         <div class="detail-block">
           <div class="label">作业点评 · 可选，AI 按本周知识点批改</div>
@@ -238,6 +243,7 @@ function renderLibrary() {
         <h3>${r.title}</h3>
         <div class="author">${r.author}</div>
         <p>${r.note}</p>
+        ${r.weeks ? `<span class="lib-weeks mono">配套 ${r.weeks}</span>` : ""}
       </div>
       <span class="lib-level">${r.level}</span>
     </article>
@@ -2927,6 +2933,15 @@ ${theoryLines}
     state.week = week;
     $("#hwTitle").textContent = `Week ${String(week).padStart(2, "0")} 作业点评`;
     $("#hwTask").textContent = item.task;
+    // 交前自检 + 本周要点（读时抓重点），作业前后都能看
+    const brief = $("#hwBrief");
+    if (brief) {
+      const pts = (item.readPoints || []).slice(0, 3).map((t) => `<li>${esc(t)}</li>`).join("");
+      brief.innerHTML =
+        `<div class="hw-brief-row"><strong>交前自检</strong><span>${esc(item.checkpoint)}</span></div>` +
+        (pts ? `<div class="hw-brief-row"><strong>本周要点</strong><ul>${pts}</ul></div>` : "");
+      brief.classList.remove("hidden");
+    }
     resetPhotos();
     $("#hwNote").value = "";
     $("#hwMeta").textContent = "";
