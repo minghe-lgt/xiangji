@@ -3,6 +3,13 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+/** HTML 转义：所有 innerHTML 模板里的外部字符串（文件名 / EXIF / AI 返回）必须过这里 */
+const esc = (s) =>
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+
 const STORE_KEYS = {
   plan: "lightjournal.plan.v2",
   journal: "lightjournal.journal.v2",
@@ -106,6 +113,10 @@ function renderPlan() {
 function weekCard(item) {
   const done = !!planState[item.week];
   const quiz = item.quiz || [];
+  const hw = (loadHomework()[item.week] || [])[0];
+  const hwBadge = hw
+    ? `<span class="mono">上次 ${hw.score ?? "—"} 分 · ${new Date(hw.at).toLocaleDateString("zh-CN")}</span>`
+    : `<span class="mono">按本周任务拍照后交</span>`;
   return `
     <article class="plan-card ${done ? "done" : ""}" data-week="${item.week}">
       <div class="plan-week">
@@ -138,6 +149,13 @@ function weekCard(item) {
           <div class="label">推荐阅读</div>
           <p>${item.reading}</p>
         </div>
+        <div class="detail-block">
+          <div class="label">作业点评 · 可选，AI 按本周知识点批改</div>
+          <div class="hw-bar">
+            <button class="btn btn-ghost sm" type="button" data-hw="${item.week}">${hw ? "查看 / 重交作业" : "交作业 · AI 点评"}</button>
+            ${hwBadge}
+          </div>
+        </div>
       </div>
       <label class="plan-check">
         <input type="checkbox" ${done ? "checked" : ""} data-check="${item.week}" />
@@ -149,6 +167,12 @@ function weekCard(item) {
 
 function bindPlan() {
   $("#stageBlocks").addEventListener("click", (e) => {
+    const hw = e.target.closest("[data-hw]");
+    if (hw) {
+      e.stopPropagation();
+      openHomework(Number(hw.dataset.hw));
+      return;
+    }
     const h = e.target.closest("[data-toggle]");
     if (h) {
       const card = h.closest(".plan-card");
@@ -269,10 +293,10 @@ function renderJournal() {
       <div class="j-item">
         <img class="j-thumb" src="${item.thumb || ""}" alt="" />
         <div class="j-main">
-          <h4>${item.name || "未命名"}</h4>
-          <p>${item.date || ""} · ${item.grade || ""} · ${(item.topTip || "").replace(/</g, "&lt;")}</p>
+          <h4>${esc(item.name || "未命名")}</h4>
+          <p>${esc(item.date || "")} · ${esc(item.grade || "")} · ${esc(item.topTip || "")}</p>
         </div>
-        <div class="j-score">${item.score ?? "—"}</div>
+        <div class="j-score">${esc(item.score ?? "—")}</div>
       </div>
     `
       )
@@ -450,12 +474,12 @@ function setupUpload() {
             light: "用光",
             story: "叙事",
             technical: "技术",
-          }[k] || k;
-          return `<div class="ai-score"><span>${name}</span><strong>${v}</strong></div>`;
+          }[k] || esc(k);
+          return `<div class="ai-score"><span>${name}</span><strong>${esc(v)}</strong></div>`;
         })
         .join("");
-      $("#aiStrengths").innerHTML = (ai.strengths || []).map((x) => `<li>${x}</li>`).join("") || "<li>—</li>";
-      $("#aiImprovements").innerHTML = (ai.improvements || []).map((x) => `<li>${x}</li>`).join("") || "<li>—</li>";
+      $("#aiStrengths").innerHTML = (ai.strengths || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li>—</li>";
+      $("#aiImprovements").innerHTML = (ai.improvements || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li>—</li>";
       $("#aiComposition").textContent = ai.composition || "—";
       $("#aiLight").textContent = ai.light || "—";
       $("#aiColor").textContent = ai.color || "—";
@@ -491,11 +515,7 @@ function setupUpload() {
       lastLocalResult = result;
       renderResults(result);
 
-      if (analysisMode !== "ai") {
-        $("#resultsBody").classList.remove("hidden");
-      } else {
-        $("#resultsBody").classList.remove("hidden");
-      }
+      $("#resultsBody").classList.remove("hidden");
 
       saveJournalEntry({
         name: file.name.length > 24 ? file.name.slice(0, 24) + "…" : file.name,
@@ -578,8 +598,16 @@ const GRADE_SLIDERS = [
   { key: "curveShadows", name: "暗部", min: -100, max: 100, scale: 1, group: "curve" },
   { key: "curveMids", name: "中间调", min: -100, max: 100, scale: 1, group: "curve" },
   { key: "curveHighlights", name: "高光", min: -100, max: 100, scale: 1, group: "curve" },
+  { key: "hueRed", name: "红·色相", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "satRed", name: "红·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
   { key: "hueOrange", name: "橙·色相", min: -100, max: 100, scale: 1, group: "hsl" },
   { key: "satOrange", name: "橙·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "hueYellow", name: "黄·色相", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "satYellow", name: "黄·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "hueGreen", name: "绿·色相", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "satGreen", name: "绿·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "hueAqua", name: "青·色相", min: -100, max: 100, scale: 1, group: "hsl" },
+  { key: "satAqua", name: "青·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
   { key: "hueBlue", name: "蓝·色相", min: -100, max: 100, scale: 1, group: "hsl" },
   { key: "satBlue", name: "蓝·饱和", min: -100, max: 100, scale: 1, group: "hsl" },
   { key: "splitStrength", name: "强度", min: 0, max: 100, scale: 1, group: "split" },
@@ -607,9 +635,38 @@ let gradeState = {
   showingOriginal: false,
   activePreset: null,
   originalBlob: null,
-  originalBytes: null,
   originalName: "",
+  masks: [],
+  activeMaskId: null,
+  editMode: "global", // global | mask
+  undo: [],
 };
+
+function gradeSnapshot() {
+  return JSON.parse(
+    JSON.stringify({
+      params: gradeState.params,
+      masks: gradeState.masks,
+      activeMaskId: gradeState.activeMaskId,
+    })
+  );
+}
+
+function gradePushUndo() {
+  gradeState.undo.push(gradeSnapshot());
+  if (gradeState.undo.length > 30) gradeState.undo.shift();
+}
+
+function gradeUndo() {
+  const snap = gradeState.undo.pop();
+  if (!snap) return;
+  gradeState.params = { ...DEFAULT_GRADE, ...snap.params };
+  gradeState.masks = snap.masks || [];
+  gradeState.activeMaskId = snap.activeMaskId || gradeState.masks[0]?.id || null;
+  renderSliders();
+  if (typeof renderMaskUI === "function") renderMaskUI();
+  repaintGrade();
+}
 
 function setupGrade() {
   const drop = $("#gradeDrop");
@@ -690,6 +747,11 @@ function setupGrade() {
     } else {
       gradeState.params = { ...DEFAULT_GRADE, ...preset.params };
     }
+    if (Array.isArray(preset.masks) && preset.masks.length) {
+      gradePushUndo();
+      gradeState.masks = preset.masks;
+      gradeState.activeMaskId = preset.masks[0].id;
+    }
     gradeState.activePreset = preset.id;
     gradeState.showingOriginal = false;
     renderSliders();
@@ -701,7 +763,7 @@ function setupGrade() {
   $("#savePresetBtn")?.addEventListener("click", () => {
     const name = prompt("预设名称（最多 16 字）", "我的预设");
     if (!name) return;
-    const item = saveUserPreset(name, gradeState.params);
+    const item = saveUserPreset(name, gradeState.params, "含局部蒙版", gradeState.masks);
     activeCat = "我的";
     renderPresetCats();
     renderPresets();
@@ -721,6 +783,16 @@ function setupGrade() {
       const text = await f.text();
       const obj = JSON.parse(text);
       const item = importPresetJSON(obj);
+      if (Array.isArray(obj.masks) && obj.masks.length && gradeState.sourceCanvas) {
+        const masks = sanitizeMasks(obj.masks);
+        if (masks.length) {
+          gradePushUndo();
+          gradeState.masks = masks;
+          gradeState.activeMaskId = masks[0].id;
+          renderMaskUI();
+          repaintGrade();
+        }
+      }
       activeCat = "我的";
       renderPresetCats();
       renderPresets();
@@ -736,16 +808,40 @@ function setupGrade() {
       name: "光影手帐预设-" + new Date().toISOString().slice(0, 10),
       desc: "自定义调色参数",
       params: gradeState.params,
+      masks: gradeState.masks,
     };
     const json = exportPresetJSON(current);
     const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
     downloadBlob(blob, `preset-${Date.now()}.json`);
   });
 
+  $("#copyParamsBtn")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify({ params: gradeState.params, masks: gradeState.masks }, null, 2));
+      alert("调色参数已复制到剪贴板");
+    } catch {
+      prompt("手动复制：", JSON.stringify(gradeState.params));
+    }
+  });
+
+  $("#gradeUndoBtn")?.addEventListener("click", () => gradeUndo());
+
+  // 滑杆/蒙版变更前压栈（节流）
+  const pushSoon = () => {
+    if (pushSoon._t) return;
+    pushSoon._t = setTimeout(() => {
+      pushSoon._t = null;
+      gradePushUndo();
+    }, 400);
+  };
+  $(".gp-body")?.addEventListener("pointerdown", pushSoon);
+  $("#maskList")?.addEventListener("click", pushSoon);
+
   // sliders
   renderSliders();
   bindSliders();
   bindGradeTabs();
+  bindMaskUI();
   $("#resetGradeBtn").addEventListener("click", () => {
     gradeState.params = { ...DEFAULT_GRADE };
     gradeState.activePreset = null;
@@ -812,14 +908,27 @@ function setupGrade() {
 
   $("#exportBtn").addEventListener("click", async () => {
     if (!gradeState.sourceCanvas) return;
-    const full = renderFullGrade() || gradeCanvas;
-    const blob = await exportCanvasJPEG(full, 0.95);
-    if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.jpg`);
+    const btn = $("#exportBtn");
+    btn.disabled = true;
+    try {
+      const full =
+        (await renderFullGradeAsync((p) => {
+          btn.textContent = `渲染中 ${Math.round(p * 100)}%`;
+        })) || gradeCanvas;
+      const blob = await exportCanvasJPEG(full, 0.95);
+      if (blob) downloadBlob(blob, `lightjournal-grade-${Date.now()}.jpg`);
+    } catch (err) {
+      alert("导出失败：" + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "导出 JPEG";
+    }
   });
 
   // PNG：对「当前调色结果」的像素无损；若未调色则直接给原始字节（零重编码）
   $("#exportPngBtn").addEventListener("click", async () => {
     if (!gradeState.sourceCanvas) return;
+    const btn = $("#exportPngBtn");
 
     if (isNeutralGrade(gradeState.params) && gradeState.originalBlob) {
       // 未调色：直接导出原始文件字节，完全不重编码
@@ -829,16 +938,27 @@ function setupGrade() {
       return;
     }
 
-    const full = renderFullGrade() || gradeCanvas;
-    const blob = await exportCanvasPNG(full);
-    if (!blob) {
-      alert("PNG 导出失败");
-      return;
+    btn.disabled = true;
+    try {
+      const full =
+        (await renderFullGradeAsync((p) => {
+          btn.textContent = `渲染中 ${Math.round(p * 100)}%`;
+        })) || gradeCanvas;
+      const blob = await exportCanvasPNG(full);
+      if (!blob) {
+        alert("PNG 导出失败");
+        return;
+      }
+      if (blob.type !== "image/png") {
+        alert("导出格式异常：" + blob.type + "，已按 PNG 重试");
+      }
+      downloadBlob(blob, `lightjournal-grade-${Date.now()}.png`);
+    } catch (err) {
+      alert("导出失败：" + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "PNG 无损";
     }
-    if (blob.type !== "image/png") {
-      alert("导出格式异常：" + blob.type + "，已按 PNG 重试");
-    }
-    downloadBlob(blob, `lightjournal-grade-${Date.now()}.png`);
   });
 
   // 导出原始字节（不调色、不重编码）
@@ -1015,7 +1135,183 @@ function bindGradeTabs() {
     $$(".gp-pane").forEach((p) => {
       p.classList.toggle("active", p.dataset.gpane === tab.dataset.gtab);
     });
+    gradeState.editMode = tab.dataset.gtab === "mask" ? "mask" : "global";
+    repaintGrade();
+    if (tab.dataset.gtab === "mask") renderMaskUI();
   });
+}
+
+const MASK_SLIDERS = [
+  { key: "brightness", name: "亮暗", min: -100, max: 100 },
+  { key: "exposure", name: "曝光", min: -200, max: 200, scale: 100 },
+  { key: "contrast", name: "对比", min: -100, max: 100 },
+  { key: "temp", name: "色温", min: -100, max: 100 },
+  { key: "tint", name: "色调", min: -100, max: 100 },
+  { key: "saturation", name: "饱和", min: -100, max: 100 },
+  { key: "clarity", name: "清晰", min: -100, max: 100 },
+];
+
+const MASK_GEO_RADIAL = [
+  { key: "x", name: "位置X", min: 0, max: 100, scale: 100 },
+  { key: "y", name: "位置Y", min: 0, max: 100, scale: 100 },
+  { key: "rx", name: "宽", min: 2, max: 100, scale: 100 },
+  { key: "ry", name: "高", min: 2, max: 100, scale: 100 },
+  { key: "feather", name: "羽化", min: 0, max: 100, scale: 100 },
+];
+
+const MASK_GEO_GRAD = [
+  { key: "x", name: "位置X", min: 0, max: 100, scale: 100 },
+  { key: "y", name: "位置Y", min: 0, max: 100, scale: 100 },
+  { key: "angle", name: "角度", min: -180, max: 180, scale: 1 },
+  { key: "length", name: "长度", min: 5, max: 150, scale: 100 },
+  { key: "feather", name: "羽化", min: 0, max: 100, scale: 100 },
+];
+
+function activeMask() {
+  return gradeState.masks.find((m) => m.id === gradeState.activeMaskId) || null;
+}
+
+function renderMaskUI() {
+  const list = $("#maskList");
+  if (!list) return;
+  list.innerHTML =
+    gradeState.masks
+      .map(
+        (m, i) => `
+    <button type="button" class="mask-chip ${m.id === gradeState.activeMaskId ? "active" : ""}" data-mid="${m.id}">
+      ${m.type === "radial" ? "径向" : "渐变"} #${i + 1}${m.invert ? " 反" : ""}
+    </button>`
+      )
+      .join("") || `<p class="calc-note">还没有蒙版，点「+ 径向」或「+ 渐变」</p>`;
+
+  const m = activeMask();
+  const inv = $("#maskInvert");
+  if (inv) inv.checked = !!(m && m.invert);
+
+  const sl = $("#maskSliders");
+  const geo = $("#maskGeo");
+  if (!sl || !geo) return;
+  if (!m) {
+    sl.innerHTML = "";
+    geo.innerHTML = "";
+    return;
+  }
+  sl.innerHTML = MASK_SLIDERS.map((s) => {
+    const scale = s.scale || 1;
+    const raw = m.params[s.key] ?? 0;
+    return `<div class="slider-row">
+      <label for="ms-${s.key}">${s.name}</label>
+      <input type="range" id="ms-${s.key}" data-mkey="${s.key}" data-scale="${scale}" min="${s.min}" max="${s.max}" value="${Math.round(raw * scale)}" />
+      <span class="val">${(raw).toFixed(scale > 1 ? 2 : 0)}</span>
+    </div>`;
+  }).join("");
+
+  const geoDefs = m.type === "radial" ? MASK_GEO_RADIAL : MASK_GEO_GRAD;
+  geo.innerHTML = geoDefs.map((s) => {
+    const scale = s.scale || 1;
+    const raw = m[s.key] ?? 0;
+    return `<div class="slider-row">
+      <label for="mg-${s.key}">${s.name}</label>
+      <input type="range" id="mg-${s.key}" data-gkey="${s.key}" data-scale="${scale}" min="${s.min}" max="${s.max}" value="${Math.round(raw * scale)}" />
+      <span class="val">${(raw).toFixed(scale > 1 ? 2 : 0)}</span>
+    </div>`;
+  }).join("");
+}
+
+function bindMaskUI() {
+  $("#maskAddRadial")?.addEventListener("click", () => {
+    const m = createRadialMask();
+    gradeState.masks.push(m);
+    gradeState.activeMaskId = m.id;
+    gradeState.editMode = "mask";
+    renderMaskUI();
+    repaintGrade();
+  });
+  $("#maskAddGrad")?.addEventListener("click", () => {
+    const m = createGradMask();
+    gradeState.masks.push(m);
+    gradeState.activeMaskId = m.id;
+    gradeState.editMode = "mask";
+    renderMaskUI();
+    repaintGrade();
+  });
+  $("#maskDel")?.addEventListener("click", () => {
+    const m = activeMask();
+    if (!m) return;
+    gradeState.masks = gradeState.masks.filter((x) => x.id !== m.id);
+    gradeState.activeMaskId = gradeState.masks[0]?.id || null;
+    renderMaskUI();
+    repaintGrade();
+  });
+  $("#maskList")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-mid]");
+    if (!b) return;
+    gradeState.activeMaskId = b.dataset.mid;
+    renderMaskUI();
+    repaintGrade();
+  });
+  $("#maskInvert")?.addEventListener("change", (e) => {
+    const m = activeMask();
+    if (!m) return;
+    m.invert = e.target.checked;
+    renderMaskUI();
+    repaintGrade();
+  });
+  $(".gp-body")?.addEventListener("input", (e) => {
+    const m = activeMask();
+    if (!m) return;
+    const mi = e.target.closest("[data-mkey]");
+    if (mi) {
+      const scale = Number(mi.dataset.scale) || 1;
+      m.params[mi.dataset.mkey] = Number(mi.value) / scale;
+      const val = mi.parentElement?.querySelector(".val");
+      if (val) val.textContent = (Number(mi.value) / scale).toFixed(scale > 1 ? 2 : 0);
+      repaintGrade();
+      return;
+    }
+    const gi = e.target.closest("[data-gkey]");
+    if (gi) {
+      const scale = Number(gi.dataset.scale) || 1;
+      m[gi.dataset.gkey] = Number(gi.value) / scale;
+      const val = gi.parentElement?.querySelector(".val");
+      if (val) val.textContent = (Number(gi.value) / scale).toFixed(scale > 1 ? 2 : 0);
+      repaintGrade();
+    }
+  });
+
+  // 画布拖动移蒙版
+  const cv = $("#gradeCanvas");
+  let dragging = false;
+  const move = (e) => {
+    const m = activeMask();
+    if (!m || !dragging) return;
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX ?? e.touches?.[0]?.clientX ?? 0) - rect.left;
+    const y = (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - rect.top;
+    m.x = Math.min(1, Math.max(0, x / Math.max(1, rect.width)));
+    m.y = Math.min(1, Math.max(0, y / Math.max(1, rect.height)));
+    repaintGrade();
+    renderMaskUI();
+  };
+  cv?.addEventListener("mousedown", (e) => {
+    if (gradeState.editMode !== "mask" || !activeMask()) return;
+    dragging = true;
+    move(e);
+  });
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+  });
+  cv?.addEventListener("wheel", (e) => {
+    const m = activeMask();
+    if (!m || m.type !== "radial" || gradeState.editMode !== "mask") return;
+    e.preventDefault();
+    const k = e.deltaY > 0 ? 0.94 : 1.06;
+    m.rx = Math.min(1.2, Math.max(0.04, m.rx * k));
+    m.ry = Math.min(1.2, Math.max(0.04, m.ry * k));
+    repaintGrade();
+    renderMaskUI();
+  }, { passive: false });
 }
 
 function bindSliders() {
@@ -1039,6 +1335,15 @@ function bindSliders() {
 }
 
 function repaintGrade() {
+  // 拖滑杆时 rAF 节流，避免卡顿
+  if (repaintGrade._raf) return;
+  repaintGrade._raf = requestAnimationFrame(() => {
+    repaintGrade._raf = null;
+    repaintGradeNow();
+  });
+}
+
+function repaintGradeNow() {
   if (!gradeState.sourceCanvas) return;
   const target = $("#gradeCanvas");
   const src = gradeState.sourceCanvas;
@@ -1051,7 +1356,6 @@ function repaintGrade() {
   }
 
   // 预览可以缩，但导出用 sourceCanvas 全分辨率
-  // 这里把 target 画成预览尺寸；导出时单独走 full render
   const maxPreview = 1600;
   let sw = src.width;
   let sh = src.height;
@@ -1066,16 +1370,74 @@ function repaintGrade() {
   work.height = sh;
   work.getContext("2d").drawImage(src, 0, 0, sw, sh);
 
-  const graded = applyGrade(work, gradeState.params);
+  const graded = applyGradeWithMasks(work, gradeState.params, gradeState.masks);
   target.width = graded.width;
   target.height = graded.height;
   target.getContext("2d").drawImage(graded, 0, 0);
+
+  // 直方图（节流）
+  if (!repaintGrade._histT || Date.now() - repaintGrade._histT > 120) {
+    repaintGrade._histT = Date.now();
+    try {
+      updateGradeHistogram(graded);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  // 选中蒙版辅助线
+  const active = gradeState.masks.find((m) => m.id === gradeState.activeMaskId);
+  if (active && gradeState.editMode === "mask") {
+    drawMaskOverlay(target, active, true);
+  }
 }
 
-/** 全分辨率调色渲染（导出用） */
-function renderFullGrade() {
+function updateGradeHistogram(canvas) {
+  const el = $("#gradeHist");
+  if (!el) return;
+  const w = Math.min(160, canvas.width);
+  const h = Math.min(100, canvas.height);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(canvas, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const hist = new Float64Array(256);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    hist[L | 0]++;
+  }
+  // draw on #gradeHist
+  const gh = el;
+  const gctx = gh.getContext("2d");
+  const gw = gh.clientWidth || 280;
+  const ghh = 72;
+  gh.width = gw * (window.devicePixelRatio || 1);
+  gh.height = ghh * (window.devicePixelRatio || 1);
+  gctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+  gctx.clearRect(0, 0, gw, ghh);
+  gctx.fillStyle = "rgba(0,0,0,0.35)";
+  gctx.fillRect(0, 0, gw, ghh);
+  let mx = 0.0001;
+  for (let i = 0; i < 256; i++) if (hist[i] > mx) mx = hist[i];
+  gctx.beginPath();
+  gctx.moveTo(0, ghh);
+  for (let i = 0; i < 256; i++) {
+    const x = (i / 255) * gw;
+    const y = ghh - Math.min(1, hist[i] / (mx * 0.55)) * (ghh - 4);
+    gctx.lineTo(x, y);
+  }
+  gctx.lineTo(gw, ghh);
+  gctx.closePath();
+  gctx.fillStyle = "rgba(212,160,84,0.75)";
+  gctx.fill();
+}
+
+/** 全分辨率调色渲染（导出用，分块异步 + 进度 0..1） */
+async function renderFullGradeAsync(onProgress) {
   if (!gradeState.sourceCanvas) return null;
-  return applyGrade(gradeState.sourceCanvas, gradeState.params);
+  return applyGradeWithMasksAsync(gradeState.sourceCanvas, gradeState.params, gradeState.masks, onProgress);
 }
 
 async function handleGradeFile(file) {
@@ -1105,7 +1467,7 @@ async function handleGradeFile(file) {
     gradeState.activePreset = null;
     gradeState.showingOriginal = false;
     gradeState.originalBlob = loaded.originalBlob || null;
-    gradeState.originalBytes = loaded.originalBytes || null;
+    gradeState.originalBlob = loaded.originalBlob || null;
     gradeState.originalName = loaded.originalName || file.name;
 
     $("#gradeEmpty").classList.add("hidden");
@@ -1166,10 +1528,10 @@ function renderOrgPreview() {
     <div class="org-item">
       <img class="org-thumb" src="${it.thumb || ""}" alt="" />
       <div class="path">
-        ${it.planned ? it.planned.path : it.relPath}
-        ${it.exifSummary ? `<div class="org-exif mono">${it.exifSummary}</div>` : ""}
+        ${esc(it.planned ? it.planned.path : it.relPath)}
+        ${it.exifSummary ? `<div class="org-exif mono">${esc(it.exifSummary)}</div>` : ""}
       </div>
-      <span class="tag">${it.category || "…"}</span>
+      <span class="tag">${esc(it.category || "…")}</span>
     </div>
   `
     )
@@ -1556,21 +1918,6 @@ function setupCalculators() {
   });
 }
 
-/* ========== Mode switch ========== */
-function setupModeSwitch() {
-  const box = $("#modeSwitch");
-  if (!box) return;
-  box.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-mode]");
-    if (!btn) return;
-    const mode = btn.dataset.mode;
-    $$(".mode-btn").forEach((b) => b.classList.toggle("active", b === btn));
-    document.body.classList.remove("mode-learn", "mode-tool");
-    if (mode === "learn") document.body.classList.add("mode-learn");
-    if (mode === "tool") document.body.classList.add("mode-tool");
-  });
-}
-
 /* ========== Watermark batch ========== */
 function setupWatermark() {
   const drop = $("#wmDrop");
@@ -1579,6 +1926,7 @@ function setupWatermark() {
   let wmType = "text";
   let wmStyle = "br";
   let logoImage = null;
+  let logoUrl = null; // 预览图持有的 objectURL，换图/清除时释放
 
   // 文字与常用设置：填过就记住，除非自己改
   const WM_TEXT_KEY = "lightjournal.wmText";
@@ -1616,7 +1964,9 @@ function setupWatermark() {
   $("#wmLogoFile")?.addEventListener("change", (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
+    if (logoUrl) URL.revokeObjectURL(logoUrl);
     const url = URL.createObjectURL(f);
+    logoUrl = url;
     const img = new Image();
     img.onload = () => {
       logoImage = img;
@@ -1630,6 +1980,10 @@ function setupWatermark() {
 
   $("#wmLogoClear")?.addEventListener("click", () => {
     logoImage = null;
+    if (logoUrl) {
+      URL.revokeObjectURL(logoUrl);
+      logoUrl = null;
+    }
     $("#wmLogoPreview").classList.add("hidden");
     $("#wmLogoStatus").textContent = "未上传 Logo（可选）";
     $("#wmLogoFile").value = "";
@@ -1767,12 +2121,12 @@ function setupCompare() {
     grid.innerHTML = items
       .map(
         (it) => `
-      <div class="cmp-card ${it.id === winnerId ? "winner" : ""}" data-id="${it.id}">
+      <div class="cmp-card ${it.id === winnerId ? "winner" : ""}" data-id="${esc(it.id)}">
         <img src="${it.url}" alt="" />
         <div class="cmp-foot">
-          <span>${it.name}</span>
-          <input type="number" min="0" max="100" value="${it.score ?? ""}" data-score="${it.id}" placeholder="分" />
-          <button class="pick-btn ${it.id === winnerId ? "active" : ""}" data-pick="${it.id}" type="button">选它</button>
+          <span>${esc(it.name)}</span>
+          <input type="number" min="0" max="100" value="${it.score ?? ""}" data-score="${esc(it.id)}" placeholder="分" />
+          <button class="pick-btn ${it.id === winnerId ? "active" : ""}" data-pick="${esc(it.id)}" type="button">选它</button>
         </div>
       </div>
     `
@@ -1789,6 +2143,7 @@ function setupCompare() {
   }
 
   function addFiles(fileList) {
+    items.forEach((it) => URL.revokeObjectURL(it.url));
     const list = [...fileList].slice(0, 6);
     items = list.map((f, i) => ({
       id: "c" + Date.now() + i,
@@ -1862,9 +2217,10 @@ const assessState = {
 function setupAssessment() {
   const list = $("#quizList");
   if (!list) return;
+  assessState.questions = pickDiagnosticSet(); // 每次进入诊断均衡抽题
 
   function renderQuiz() {
-    list.innerHTML = QUIZ_BANK.map(
+    list.innerHTML = assessState.questions.map(
       (q) => `
       <div class="quiz-card" data-qid="${q.id}">
         <div class="q-meta">Q${q.id} · ${QUIZ_DIMENSIONS[q.dim].name} · ${"★".repeat(q.level)}</div>
@@ -1893,7 +2249,7 @@ function setupAssessment() {
 
   function updateQuizProgress() {
     const n = Object.keys(assessState.answers).length;
-    $("#quizProgress").textContent = `${n} / ${QUIZ_BANK.length}`;
+    $("#quizProgress").textContent = `${n} / ${assessState.questions.length}`;
   }
 
   list.addEventListener("change", (e) => {
@@ -1909,6 +2265,7 @@ function setupAssessment() {
 
   $("#quizResetBtn").addEventListener("click", () => {
     assessState.answers = {};
+    assessState.questions = pickDiagnosticSet(); // 重测换一批题
     renderQuiz();
     $("#assessReport").classList.add("hidden");
     $("#assessQuizWrap").classList.remove("hidden");
@@ -1925,7 +2282,9 @@ function setupAssessment() {
         quizAnswers: assessState.answers,
         photoResults: null,
         baseline: loadBaseline(),
+        questions: assessState.questions,
       });
+      saveQuizAttempt(report);
       renderReport(report);
       $("#assessReport").classList.remove("hidden");
       $("#assessQuizWrap").classList.add("hidden");
@@ -1938,8 +2297,8 @@ function setupAssessment() {
 
   $("#quizSubmitBtn").addEventListener("click", () => {
     const n = Object.keys(assessState.answers).length;
-    if (n < QUIZ_BANK.length) {
-      if (!confirm(`还有 ${QUIZ_BANK.length - n} 题未作答（未答按「不懂」计）。仍要出分吗？`)) return;
+    if (n < assessState.questions.length) {
+      if (!confirm(`还有 ${assessState.questions.length - n} 题未作答（未答按「不懂」计）。仍要出分吗？`)) return;
     }
     runReport(false);
   });
@@ -1998,8 +2357,10 @@ function setupAssessment() {
         ? `已选 ${n} 张（建议 10–20 张，仍可继续）`
         : `已选 ${n} 张`
       : "未选择";
-    $("#assessThumbs").innerHTML = imgs
-      .map((f) => `<img src="${URL.createObjectURL(f)}" alt="" />`)
+    assessState.thumbUrls?.forEach((u) => URL.revokeObjectURL(u));
+    assessState.thumbUrls = imgs.map((f) => URL.createObjectURL(f));
+    $("#assessThumbs").innerHTML = assessState.thumbUrls
+      .map((u) => `<img src="${u}" alt="" />`)
       .join("");
   }
 
@@ -2229,7 +2590,353 @@ function setupSidebar() {
   });
 }
 
+/* ========== 九宫格组照导出 ========== */
+function setupCollage() {
+  const drop = $("#collageDrop");
+  const input = $("#collageFiles");
+  if (!drop) return;
+  let files = [];
+
+  $("#collagePick")?.addEventListener("click", () => input.click());
+  input?.addEventListener("change", () => {
+    files = [...(input.files || [])].slice(0, 9);
+    $("#collageStatus").textContent = files.length ? `已选 ${files.length} 张（最多 9）` : "未选择";
+    renderCollagePreview();
+  });
+
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+    })
+  );
+  drop.addEventListener("drop", (e) => {
+    files = [...(e.dataTransfer.files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 9);
+    $("#collageStatus").textContent = files.length ? `已选 ${files.length} 张` : "未选择";
+    renderCollagePreview();
+  });
+
+  async function renderCollagePreview() {
+    const box = $("#collagePreview");
+    if (!box) return;
+    if (!files.length) {
+      box.innerHTML = "";
+      return;
+    }
+    const cell = 200;
+    const canvas = await buildCollageCanvas(files, cell, Number($("#collageGap")?.value || 8), $("#collageBg")?.value || "#111");
+    box.innerHTML = "";
+    canvas.style.maxWidth = "100%";
+    canvas.style.height = "auto";
+    box.appendChild(canvas);
+    box._canvas = canvas;
+  }
+
+  async function buildCollageCanvas(fileList, cell, gap, bg) {
+    const n = Math.max(1, Math.min(9, fileList.length));
+    const cols = n <= 2 ? n : 3;
+    const rows = Math.ceil(n / cols);
+    const canvas = document.createElement("canvas");
+    canvas.width = cols * cell + (cols + 1) * gap;
+    canvas.height = rows * cell + (rows + 1) * gap;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < n; i++) {
+      const url = URL.createObjectURL(fileList[i]);
+      try {
+        const img = await loadImage(url);
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = gap + col * (cell + gap);
+        const y = gap + row * (cell + gap);
+        // cover fit
+        const s = Math.max(cell / img.naturalWidth, cell / img.naturalHeight);
+        const dw = img.naturalWidth * s;
+        const dh = img.naturalHeight * s;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, cell, cell);
+        ctx.clip();
+        ctx.drawImage(img, x + (cell - dw) / 2, y + (cell - dh) / 2, dw, dh);
+        ctx.restore();
+      } catch {
+        /* skip */
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+    return canvas;
+  }
+
+  $("#collageExport")?.addEventListener("click", async () => {
+    if (!files.length) return alert("请先选择 1–9 张照片");
+    const cell = 800;
+    const gap = Number($("#collageGap")?.value || 8);
+    const canvas = await buildCollageCanvas(files, cell, gap, $("#collageBg")?.value || "#111");
+    const blob = await exportCanvasPNG(canvas);
+    if (blob) downloadBlob(blob, `九宫格-${Date.now()}.png`);
+    $("#collageStatus").textContent = "已导出 PNG 无损";
+  });
+
+  $("#collageGap")?.addEventListener("input", renderCollagePreview);
+}
+
 /* ========== Boot ========== */
+/* ========== 数据备份（全部进度一键导出/导入） ========== */
+function setupDataBackup() {
+  const exportBtn = $("#backupExportBtn");
+  if (!exportBtn) return;
+
+  exportBtn.addEventListener("click", () => {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("lightjournal.")) data[k] = localStorage.getItem(k);
+    }
+    const payload = {
+      format: "lightjournal-backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const d = new Date();
+    downloadBlob(
+      blob,
+      `光影手帐备份-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`
+    );
+    const hasKey = !!data["lightjournal.llm"];
+    $("#backupStatus").textContent = `已导出 ${Object.keys(data).length} 项${hasKey ? "（含 LLM Key）" : ""}`;
+  });
+
+  $("#backupImportBtn")?.addEventListener("click", () => $("#backupFile").click());
+
+  $("#backupFile")?.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      if (!obj || obj.format !== "lightjournal-backup" || !obj.data || typeof obj.data !== "object") {
+        throw new Error("不是有效的光影手帐备份文件");
+      }
+      const keys = Object.keys(obj.data).filter((k) => k.startsWith("lightjournal."));
+      if (!keys.length) throw new Error("备份里没有可恢复的数据");
+      const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("zh-CN") : "未知时间";
+      if (!confirm(`将恢复 ${keys.length} 项数据（备份于 ${when}），并覆盖当前全部进度。继续？`)) return;
+      let restored = 0;
+      for (const k of keys) {
+        const v = obj.data[k];
+        if (typeof v !== "string") continue;
+        try {
+          JSON.parse(v); // 拒绝损坏条目
+        } catch {
+          continue;
+        }
+        localStorage.setItem(k, v);
+        restored++;
+      }
+      alert(`已恢复 ${restored} 项，页面即将刷新。`);
+      location.reload();
+    } catch (err) {
+      alert("导入失败：" + (err.message || err));
+    }
+    e.target.value = "";
+  });
+}
+
+/* ========== 作业点评（每周任务 → AI 按知识点批改） ========== */
+const HW_STORE_KEY = "lightjournal.homework.v1";
+
+function loadHomework() {
+  try {
+    return JSON.parse(localStorage.getItem(HW_STORE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveHomeworkEntry(week, entry) {
+  try {
+    const all = loadHomework();
+    const list = Array.isArray(all[week]) ? all[week] : all[week] ? [all[week]] : [];
+    list.unshift(entry);
+    all[week] = list.slice(0, 3); // 每周保留最近 3 次点评
+    localStorage.setItem(HW_STORE_KEY, JSON.stringify(all));
+  } catch (e) {
+    console.warn("save homework failed", e);
+  }
+}
+
+function setupHomework() {
+  const overlay = $("#hwOverlay");
+  if (!overlay) return;
+
+  const state = { week: 0, photos: [], thumbUrls: [] };
+
+  const close = () => overlay.classList.add("hidden");
+  $("#hwCloseBtn").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+
+  function resetPhotos() {
+    state.photos = [];
+    state.thumbUrls?.forEach((u) => URL.revokeObjectURL(u));
+    state.thumbUrls = [];
+    $("#hwThumbs").innerHTML = "";
+    $("#hwStatus").textContent = "未选择";
+  }
+
+  function acceptFiles(fileList) {
+    const imgs = [...fileList].filter((f) => f.type.startsWith("image/")).slice(0, 5);
+    if (!imgs.length) {
+      $("#hwStatus").textContent = "没有可用图片";
+      return;
+    }
+    state.photos = imgs;
+    state.thumbUrls?.forEach((u) => URL.revokeObjectURL(u));
+    state.thumbUrls = imgs.map((f) => URL.createObjectURL(f));
+    $("#hwThumbs").innerHTML = state.thumbUrls.map((u) => `<img src="${u}" alt="" />`).join("");
+    $("#hwStatus").textContent = `已选 ${imgs.length} 张`;
+  }
+
+  $("#hwPickBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    $("#hwFiles").click();
+  });
+  $("#hwFiles").addEventListener("change", (e) => acceptFiles(e.target.files));
+  ["dragenter", "dragover"].forEach((ev) =>
+    $("#hwDrop").addEventListener(ev, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    })
+  );
+  $("#hwDrop").addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    acceptFiles(e.dataTransfer.files || []);
+  });
+
+  async function fileToCanvas(file, maxSide = 1280) {
+    const loaded = await loadPhotoFile(file);
+    try {
+      const img = loaded.img;
+      const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.naturalWidth * s));
+      c.height = Math.max(1, Math.round(img.naturalHeight * s));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      return c;
+    } finally {
+      loaded.cleanup?.();
+    }
+  }
+
+  $("#hwRunBtn").addEventListener("click", async () => {
+    const week = state.week;
+    const item = STAGES.flatMap((s) => s.weeks).find((w) => w.week === week);
+    if (!item) return;
+    if (!state.photos.length) {
+      alert("先选 1–5 张作业照片");
+      return;
+    }
+    if (!llmConfigReady()) {
+      alert("尚未配置大模型。请到「调色工作台 → 厂商设置」填写 API Key 后再交作业（本地功能不受影响）。");
+      return;
+    }
+    const btn = $("#hwRunBtn");
+    btn.disabled = true;
+    const meta = $("#hwMeta");
+    meta.textContent = "读图中…";
+    try {
+      const canvases = [];
+      for (const f of state.photos) canvases.push(await fileToCanvas(f));
+      const note = ($("#hwNote").value || "").trim().slice(0, 200);
+      meta.textContent = "AI 批改中…";
+
+      const system = `你是摄影训练营的带队教练。学员根据本周课程任务交来作业照片，请结合本周知识点点评。
+要求：专业、具体、鼓励但不说空话；改进建议必须可执行，并扣回本周的理论要点。
+只输出 JSON，不要 markdown：
+{"taskCheck":"完成/部分完成/未完成","score":0-100,"summary":"40字内总评","strengths":["亮点1","亮点2"],"improvements":["改进1","改进2"],"nextDrill":"针对弱点的下一个练习，30字内"}`;
+
+      const theoryLines = (item.theory || []).map((t) => `- ${t}`).join("\n");
+      const userText = `本周课程：Week ${String(item.week).padStart(2, "0")} ${item.title}
+理论要点：
+${theoryLines}
+拍摄任务：${item.task}
+自检标准：${item.checkpoint}
+学员自述：${note || "（无）"}
+
+共 ${canvases.length} 张作业照片，请逐张看完再综合点评，输出 JSON。`;
+
+      const { content, vendor, model } = await callLLMVisionN({ system, userText, canvases, maxTokens: 900 });
+      const m = content.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("返回中没有找到 JSON");
+      const parsed = JSON.parse(m[0]);
+
+      const entry = {
+        at: new Date().toISOString(),
+        score: Number.isFinite(Number(parsed.score)) ? clamp(Number(parsed.score), 0, 100) : null,
+        taskCheck: String(parsed.taskCheck || "—").slice(0, 12),
+        summary: String(parsed.summary || "").slice(0, 200),
+        strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 5).map(String) : [],
+        improvements: Array.isArray(parsed.improvements) ? parsed.improvements.slice(0, 5).map(String) : [],
+        nextDrill: String(parsed.nextDrill || "").slice(0, 120),
+        note,
+      };
+      saveHomeworkEntry(week, entry);
+      meta.textContent = `${vendor} · ${model}`;
+      renderHwReport(entry);
+      renderPlan(); // 卡片上的分数徽标刷新
+    } catch (err) {
+      meta.textContent = "失败";
+      alert("作业点评失败：" + (err.message || err));
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function renderHwReport(entry) {
+    const box = $("#hwReport");
+    box.classList.remove("hidden");
+    box.innerHTML = `
+      <div class="hw-score">
+        <strong>${entry.score ?? "—"}</strong>
+        <span>/ 100 · ${esc(entry.taskCheck)}</span>
+      </div>
+      <p>${esc(entry.summary)}</p>
+      <h5>亮点</h5>
+      <ul>${entry.strengths.length ? entry.strengths.map((s) => `<li>${esc(s)}</li>`).join("") : "<li>—</li>"}</ul>
+      <h5>改进</h5>
+      <ul>${entry.improvements.length ? entry.improvements.map((s) => `<li>${esc(s)}</li>`).join("") : "<li>—</li>"}</ul>
+      <h5>下一步练习</h5>
+      <p>${esc(entry.nextDrill || "—")}</p>
+    `;
+  }
+
+  window.openHomework = (week) => {
+    const item = STAGES.flatMap((s) => s.weeks).find((w) => w.week === week);
+    if (!item) return;
+    state.week = week;
+    $("#hwTitle").textContent = `Week ${String(week).padStart(2, "0")} 作业点评`;
+    $("#hwTask").textContent = item.task;
+    resetPhotos();
+    $("#hwNote").value = "";
+    $("#hwMeta").textContent = "";
+    $("#hwReport").classList.add("hidden");
+    const history = loadHomework()[week] || [];
+    if (history.length) renderHwReport(history[0]); // 有历史先展示上一次
+    overlay.classList.remove("hidden");
+  };
+}
+
 function init() {
   setupSidebar();
   renderPath();
@@ -2244,11 +2951,13 @@ function init() {
   setupGrade();
   setupOrganize();
   setupCalculators();
-  setupModeSwitch();
   setupWatermark();
   setupCompare();
   setupCull();
+  setupCollage();
   setupAssessment();
+  setupHomework();
+  setupDataBackup();
 
   $("#clearJournalBtn").addEventListener("click", () => {
     if (!confirm("确定清空练习记录？")) return;

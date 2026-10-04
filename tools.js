@@ -40,40 +40,33 @@ function solveExposure({ aperture, shutter, iso, lock }) {
   const ISO = Number(iso);
   // EV = 2*log2(N) - log2(t) + log2(ISO/100)  （保持恒定）
   const ev = 2 * Math.log2(N) - Math.log2(t) + Math.log2(ISO / 100);
-
-  if (lock === "aperture") {
-    // 改 ISO → 求 shutter，或改 shutter → 求 iso（这里：已知 aperture，按给出的 shutter/iso 之一配平）
-    return {
-      aperture: N,
-      shutter,
-      iso,
-      ev: ev.toFixed(2),
-    };
-  }
   return { aperture: N, shutter, iso, ev: ev.toFixed(2) };
 }
 
 /** 已知 aperture, iso, 求 shutter 使曝光等同 reference */
 function matchShutter(aperture, iso, refN, refT, refISO) {
+  // t·ISO/N² 恒等：t = t_ref × (N/N_ref)² × (ISO_ref/ISO)
   const t =
     shutterToSeconds(refT) *
     Math.pow(aperture / refN, 2) *
-    (iso / refISO);
+    (refISO / iso);
   return secondsToShutter(t);
 }
 
 function matchISO(aperture, shutter, refN, refT, refISO) {
+  // ISO = ISO_ref × (N/N_ref)² × (t_ref/t)
   const iso =
     refISO *
-    Math.pow(refN / aperture, 2) *
+    Math.pow(aperture / refN, 2) *
     (shutterToSeconds(refT) / shutterToSeconds(shutter));
   return Math.round(iso);
 }
 
 function matchAperture(shutter, iso, refN, refT, refISO) {
+  // N = N_ref × √(t/t_ref × ISO/ISO_ref)
   const N =
     refN *
-    Math.sqrt((shutterToSeconds(shutter) / shutterToSeconds(refT)) * (refISO / iso));
+    Math.sqrt((shutterToSeconds(shutter) / shutterToSeconds(refT)) * (iso / refISO));
   // 就近取标准光圈
   let best = APERTURES[0];
   let bestDiff = Math.abs(best - N);

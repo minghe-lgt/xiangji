@@ -29,6 +29,13 @@ function computeLearningReport() {
 
   // 能力维度（基线）
   const ability = baseline && baseline.photoAgg ? baseline.photoAgg : null;
+  const attempts = typeof loadQuizAttempts === "function" ? loadQuizAttempts() : [];
+  const trend = attempts.length
+    ? attempts
+        .slice(0, 5)
+        .map((a) => `${new Date(a.at).toLocaleDateString("zh-CN")} ${a.combined}分`)
+        .join(" → ")
+    : "";
 
   // 已完成主题列表
   const doneTitles = doneWeeks.map((w) => `W${String(w.week).padStart(2, "0")} ${w.stage} · ${w.title}`);
@@ -137,6 +144,14 @@ function renderLearningReport(container, data) {
       </div>
 
       <div class="lr-section">
+        <h4>能力测验趋势</h4>
+        <ul class="lr-list">
+          <li>${trend || "还没有测验记录。到「能力诊断」做一次 18 题测验。"}</li>
+          ${attempts.length ? `<li>共 ${attempts.length} 次 · 最近等级 ${attempts[0].level}</li>` : ""}
+        </ul>
+      </div>
+
+      <div class="lr-section">
         <h4>已完成主题（最近）</h4>
         <ul class="lr-list">
           ${
@@ -156,7 +171,8 @@ function renderLearningReport(container, data) {
         <h4>最近分析</h4>
         <ul class="lr-list">
           ${data.journalSample
-            .map((j) => `<li>${j.date} · ${j.name} · ${j.score} 分（${j.grade || ""}）</li>`)
+            // 文件名来自用户文件系统，导出前转义防止破版式
+            .map((j) => `<li>${esc(j.date)} · ${esc(j.name)} · ${esc(j.score)} 分（${esc(j.grade || "")}）</li>`)
             .join("")}
         </ul>
       </div>`
@@ -169,9 +185,6 @@ function renderLearningReport(container, data) {
 function downloadLearningReportHTML(data) {
   const paper = $("#learningReportPaper");
   if (!paper) return;
-  const css = document.querySelector('link[href="styles.css"]')
-    ? ""
-    : "";
   const html = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>光影手帐学习报告</title>
 <style>
