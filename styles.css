@@ -3561,6 +3561,11 @@ body.mode-tool [data-group="learn"] {
   line-height: 1.6;
 }
 
+.lib-copyright-note a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .hw-brief {
   background: rgba(212, 160, 84, 0.06);
   border: 1px solid rgba(212, 160, 84, 0.22);
