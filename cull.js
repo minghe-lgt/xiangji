@@ -263,13 +263,27 @@ function cullAct(action) {
       cullLog("没有可撤销的操作");
       return;
     }
-    const target = cullState.items.find((x) => x.id === snap.id);
-    if (target) {
-      target.status = snap.status;
-      target.stars = snap.stars;
-      target.autoNote = snap.autoNote;
+    if (snap.batch) {
+      // 整批还原（智能初筛 / AI 精评的批量改动）
+      const byId = new Map(cullState.items.map((x) => [x.id, x]));
+      for (const c of snap.changes) {
+        const target = byId.get(c.id);
+        if (target) {
+          target.status = c.status;
+          target.stars = c.stars;
+          target.autoNote = c.autoNote;
+        }
+      }
+      cullLog(`已撤销整批（${snap.changes.length} 张）`, "ok");
+    } else {
+      const target = cullState.items.find((x) => x.id === snap.id);
+      if (target) {
+        target.status = snap.status;
+        target.stars = snap.stars;
+        target.autoNote = snap.autoNote;
+      }
+      cullLog("已撤销一步", "ok");
     }
-    cullLog("已撤销一步", "ok");
   } else if (action === "zoom") {
     cullState.zoom = cullState.zoom === "fit" ? "100" : "fit";
     renderCullFocus();
@@ -294,7 +308,9 @@ function cullAct(action) {
 }
 
 async function cullAddFiles(fileList, handleMap) {
-  const files = [...fileList].filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|arw|cr2|nef|dng|tiff?)$/i.test(f.name));
+  // CR3/HEIC/AVIF 也放进来：能被浏览器解码的就正常处理（如 Safari 解 HEIC），
+  // 解不了的走 catch 给出明确文案——计上数、试一次、说明白，不静默丢弃。
+  const files = [...fileList].filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|arw|cr2|cr3|nef|dng|tiff?|heic|heif|avif)$/i.test(f.name));
   cullLog(`读取 ${files.length} 张…`);
   const base = cullState.items.length;
   for (let i = 0; i < files.length; i++) {
@@ -302,9 +318,9 @@ async function cullAddFiles(fileList, handleMap) {
     try {
       let thumbUrl = "";
       let w = 0, h = 0;
-      // RAW 取内嵌预览
+      // RAW 取内嵌预览（CR3 是 ISOBMFF 容器，TIFF 系提取器覆盖不了，直接跳过免白扫）
       let loadFile = f;
-      if (isRawFile(f) && typeof extractRawPreview === "function") {
+      if (isRawFile(f) && !/\.cr3$/i.test(f.name) && typeof extractRawPreview === "function") {
         try {
           const buf = await f.arrayBuffer();
           const prev = await extractRawPreview(buf);
@@ -363,14 +379,18 @@ async function cullAddFiles(fileList, handleMap) {
  * 本地质检：只判断「技术废片」（糊/爆/死黑/灰平），
  * 不判断审美。审美交给 AI 精评。
  */
-async function cullLocalScoreItem(item, cache) {
+async function cullLocalScoreItem(item) {
   if (item._scoredLocal && item.localScore != null) return item;
-  let img = cache && cache.get(item.id);
+  let img;
   try {
-    if (!img) {
-      const url = item.thumbUrl || URL.createObjectURL(item.file);
+    // 注意：这里故意不缓存解码结果。千张级扫描时每张图只打一次分，
+    // _scoredLocal 已防重复；若把解码图存进 Map 会累积几百 MB 峰值内存。
+    // 引用随函数返回丢弃，由 GC 立即回收。
+    const url = item.thumbUrl || URL.createObjectURL(item.file);
+    try {
       img = await loadImage(url);
-      if (cache) cache.set(item.id, img);
+    } finally {
+      if (!item.thumbUrl) URL.revokeObjectURL(url);
     }
     const max = 180;
     const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight, 1));
@@ -527,6 +547,27 @@ function clampNum(n, a, b) {
   return Math.min(b, Math.max(a, n));
 }
 
+/** 撤销栈：单步快照 {id,status,stars,autoNote}；批次快照 {batch:true, changes:[...]} */
+function cullCaptureStates(items) {
+  return items.map((x) => ({ id: x.id, status: x.status, stars: x.stars, autoNote: x.autoNote }));
+}
+
+/** 把 before 快照中「实际发生了变化」的条目打包成一个批次入栈 */
+function cullPushBatchUndo(before) {
+  const byId = new Map(cullState.items.map((x) => [x.id, x]));
+  const changes = [];
+  for (const b of before) {
+    const it = byId.get(b.id);
+    if (!it) continue;
+    if (it.status !== b.status || it.stars !== b.stars || it.autoNote !== b.autoNote) {
+      changes.push(b); // 撤销时恢复的就是快照值
+    }
+  }
+  if (!changes.length) return;
+  cullState.undoStack.push({ batch: true, changes });
+  if (cullState.undoStack.length > 50) cullState.undoStack.shift();
+}
+
 /**
  * 智能初筛（保守策略）
  * - 明确废片 → 否决
@@ -541,11 +582,11 @@ async function cullSmartPrescan() {
     btn.disabled = true;
     btn.textContent = "分析中…";
   }
-  const cache = new Map();
   const n = cullState.items.length;
+  const undoBefore = cullCaptureStates(cullState.items);
   try {
     for (let i = 0; i < n; i++) {
-      await cullLocalScoreItem(cullState.items[i], cache);
+      await cullLocalScoreItem(cullState.items[i]);
       if (i % 20 === 0) {
         $("#cullStatus").textContent = `智能初筛 ${i + 1} / ${n}`;
       }
@@ -553,33 +594,58 @@ async function cullSmartPrescan() {
 
     const scores = cullState.items.map((x) => x.localScore || 0).sort((a, b) => a - b);
     const pct = (p) => scores[clampNum(Math.floor(scores.length * p), 0, scores.length - 1)] || 0;
-    const p75 = pct(0.75);
     const p40 = pct(0.4);
     const p88 = pct(0.88);
 
     cullState.items.sort((a, b) => (b.localScore || 0) - (a.localScore || 0));
 
-    // 连拍：时间窗 + 色块签名接近 → 只留队首
-    const kept = [];
-    for (const it of cullState.items) {
-      let similar = false;
-      for (const k of kept.slice(-40)) {
-        const dt = Math.abs((it.lastModified || 0) - (k.lastModified || 0));
-        if (dt > 8000) continue;
-        if (it.sig && k.sig) {
-          let dist = 0;
-          for (let i = 0; i < it.sig.length; i++) dist += Math.abs(it.sig[i] - k.sig[i]);
-          dist /= it.sig.length;
-          if (dist < 18) {
-            similar = true;
-            break;
-          }
-        } else if (Math.abs((it.localScore || 0) - (k.localScore || 0)) < 7) {
-          similar = true;
-          break;
+    // 连拍去重：先按拍摄时间聚桶（相邻间隔 > 8s 即断桶，不同时段的相似构图不算连拍），
+    // 桶内按分数从高到低留最优、其余与已留者比色块签名，签名接近 → 记为重复。
+    // 旧版按分数序与「已留的最后 40 张」乱序比较，时间窗基本失真。
+    const BURST_GAP = 8000;
+    const dupes = new Set();
+    {
+      const byTime = [...cullState.items].sort((a, b) => (a.lastModified || 0) - (b.lastModified || 0));
+      let bucket = [];
+      const flushBucket = () => {
+        if (bucket.length < 2) {
+          bucket = [];
+          return;
         }
+        bucket.sort((a, b) => (b.localScore || 0) - (a.localScore || 0));
+        const keptInBurst = [];
+        for (const it of bucket) {
+          let similar = false;
+          for (const k of keptInBurst) {
+            if (it.sig && k.sig) {
+              let dist = 0;
+              for (let i = 0; i < it.sig.length; i++) dist += Math.abs(it.sig[i] - k.sig[i]);
+              dist /= it.sig.length;
+              if (dist < 18) {
+                similar = true;
+                break;
+              }
+            } else if (Math.abs((it.localScore || 0) - (k.localScore || 0)) < 7) {
+              similar = true;
+              break;
+            }
+          }
+          if (similar) dupes.add(it);
+          else keptInBurst.push(it);
+        }
+        bucket = [];
+      };
+      for (const it of byTime) {
+        if (bucket.length && (it.lastModified || 0) - (bucket[bucket.length - 1].lastModified || 0) > BURST_GAP) {
+          flushBucket();
+        }
+        bucket.push(it);
       }
-      if (similar) {
+      flushBucket();
+    }
+
+    for (const it of cullState.items) {
+      if (dupes.has(it)) {
         it.status = "reject";
         it.stars = 0;
         it.autoNote = "连拍重复";
@@ -593,8 +659,8 @@ async function cullSmartPrescan() {
           it.autoNote = "本地候选 · 建议 AI 精评";
         }
       }
-      kept.push(it);
     }
+    cullPushBatchUndo(undoBefore);
 
     const pickN = cullState.items.filter((x) => x.status === "pick").length;
     const rejN = cullState.items.filter((x) => x.status === "reject").length;
@@ -636,6 +702,7 @@ async function cullAIScore() {
   cullAIRunning = true;
   cullState.aiAbort = false;
   if (btn) btn.textContent = "停止";
+  const undoBefore = cullCaptureStates(pool); // 精评只改 pool 内的条目
 
   const scoreOne = async (it) => {
     // 返回 true=成功（含中止）/ false=最终失败
@@ -736,6 +803,7 @@ async function cullAIScore() {
       }
     };
     await Promise.all([worker(), worker(), worker()]);
+    cullPushBatchUndo(undoBefore);
 
     cullState.items.sort((a, b) => (b.aiScore || b.localScore || 0) - (a.aiScore || a.localScore || 0));
     const failSummary = failed

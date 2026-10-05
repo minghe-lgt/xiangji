@@ -324,7 +324,7 @@ select { font: inherit; color: inherit; }
   line-height: 1.45;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 980px) {
   .quick-grid { grid-template-columns: 1fr 1fr; }
 }
 
@@ -881,7 +881,7 @@ select { font: inherit; color: inherit; }
   padding: 12px 14px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .plan-card.open .plan-detail {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -4330,7 +4330,7 @@ body.mode-tool [data-group="learn"] {
   color: var(--accent) !important;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 700px) {
   #progress .journal-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
