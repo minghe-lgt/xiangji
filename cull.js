@@ -272,6 +272,7 @@ function cullAct(action) {
           target.status = c.status;
           target.stars = c.stars;
           target.autoNote = c.autoNote;
+          target.aiScore = c.aiScore; // AI 未跑过时快照里是 undefined，正好清掉
         }
       }
       cullLog(`已撤销整批（${snap.changes.length} 张）`, "ok");
@@ -549,7 +550,7 @@ function clampNum(n, a, b) {
 
 /** 撤销栈：单步快照 {id,status,stars,autoNote}；批次快照 {batch:true, changes:[...]} */
 function cullCaptureStates(items) {
-  return items.map((x) => ({ id: x.id, status: x.status, stars: x.stars, autoNote: x.autoNote }));
+  return items.map((x) => ({ id: x.id, status: x.status, stars: x.stars, autoNote: x.autoNote, aiScore: x.aiScore }));
 }
 
 /** 把 before 快照中「实际发生了变化」的条目打包成一个批次入栈 */
@@ -559,7 +560,7 @@ function cullPushBatchUndo(before) {
   for (const b of before) {
     const it = byId.get(b.id);
     if (!it) continue;
-    if (it.status !== b.status || it.stars !== b.stars || it.autoNote !== b.autoNote) {
+    if (it.status !== b.status || it.stars !== b.stars || it.autoNote !== b.autoNote || it.aiScore !== b.aiScore) {
       changes.push(b); // 撤销时恢复的就是快照值
     }
   }

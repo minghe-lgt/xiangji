@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>光影手帐 · 摄影系统训练与专业构图分析</title>
   <meta name="description" content="六阶段 24 周摄影训练体系 + 上传照片即时专业分析（构图/曝光/色彩/清晰度/用光/平衡）。本地计算，照片不出浏览器。" />
+  <meta name="theme-color" content="#1a1512" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -1081,5 +1084,13 @@
   <script src="analyze.js"></script>
   <script src="report.js"></script>
   <script src="app.js"></script>
+  <script>
+    // PWA：HTTPS / localhost 下注册 Service Worker（网络优先，离线兜底；
+    // file:// 双击打开自动跳过，不影响任何功能）
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  </script>
+  <script src="selftest.js"></script>
 </body>
 </html>
