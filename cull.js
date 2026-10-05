@@ -710,6 +710,14 @@ async function cullAIScore() {
 
   let done = 0;
   let failed = 0;
+  const failedNames = [];
+  const prog = $("#cullAIProg");
+  const setProg = () => {
+    if (!prog) return;
+    prog.classList.remove("hidden");
+    prog.firstElementChild.style.width = Math.round((done / pool.length) * 100) + "%";
+  };
+  setProg();
   try {
     const queue = [...pool];
     const worker = async () => {
@@ -717,7 +725,11 @@ async function cullAIScore() {
         const it = queue.shift();
         const ok = await scoreOne(it);
         done++;
-        if (!ok) failed++;
+        if (!ok) {
+          failed++;
+          if (failedNames.length < 6) failedNames.push(it.name);
+        }
+        setProg();
         $("#cullStatus").textContent = cullState.aiAbort
           ? `AI 评分已停止（${done} / ${pool.length}）`
           : `AI 评分 ${done} / ${pool.length}`;
@@ -726,17 +738,24 @@ async function cullAIScore() {
     await Promise.all([worker(), worker(), worker()]);
 
     cullState.items.sort((a, b) => (b.aiScore || b.localScore || 0) - (a.aiScore || a.localScore || 0));
+    const failSummary = failed
+      ? `未成功 ${failed} 张：${failedNames.join("、")}${failed > failedNames.length ? " 等" : ""}（可再点一次 AI 精评重试）`
+      : "";
     if (cullState.aiAbort) {
-      cullLog(`AI 评分已停止：完成 ${done} / ${pool.length} 张`, "err");
+      cullLog(`AI 评分已停止：完成 ${done} / ${pool.length} 张${failed ? ` · ${failSummary}` : ""}`, "err");
       $("#cullStatus").textContent = `AI 评分已停止（${done} / ${pool.length}）`;
     } else {
-      cullLog(`AI 评分完成 ${done} / ${pool.length} 张${failed ? ` · 未成功 ${failed}` : ""}`, failed ? "err" : "ok");
-      $("#cullStatus").textContent = `AI 评分完成（${done} / ${pool.length}）`;
+      cullLog(
+        `AI 评分完成 ${done} / ${pool.length} 张${failed ? ` · ${failSummary}` : ""}`,
+        failed ? "err" : "ok"
+      );
+      $("#cullStatus").textContent = `AI 评分完成（${done} / ${pool.length}）${failed ? ` · 未成功 ${failed}` : ""}`;
     }
   } finally {
     cullAIRunning = false;
     cullState.aiAbort = false;
     if (btn) btn.textContent = "AI 精评";
+    if (prog) setTimeout(() => prog.classList.add("hidden"), 1200);
     cullStats();
     applyCullFilter();
   }

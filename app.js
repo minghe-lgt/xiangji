@@ -33,6 +33,7 @@ function saveJSON(key, value) {
 }
 
 let planState = loadJSON(STORE_KEYS.plan, {});
+let expandedWeek = null; // 同时只展开一个周；renderPlan 重绘后保持
 let activeStage = "all";
 
 const TOTAL_WEEKS = STAGES.reduce((s, st) => s + st.weeks.length, 0);
@@ -110,6 +111,19 @@ function renderPlan() {
   updateJournalWeeks();
 }
 
+/** 展开/收起某一周；force 省略时按当前状态取反。打开新的自动收起旧的。 */
+function toggleWeekCard(week, force) {
+  const open = force !== undefined ? force : expandedWeek !== week;
+  expandedWeek = open ? week : null;
+  $$("#stageBlocks .plan-card").forEach(
+    (c) => c.classList.toggle("open", Number(c.dataset.week) === expandedWeek)
+  );
+  if (open) {
+    const card = $(`.plan-card[data-week="${week}"]`);
+    if (card) requestAnimationFrame(() => card.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+  }
+}
+
 function weekCard(item) {
   const done = !!planState[item.week];
   const quiz = item.quiz || [];
@@ -117,35 +131,57 @@ function weekCard(item) {
   const hwBadge = hw
     ? `<span class="mono">上次 ${hw.score ?? "—"} 分 · ${new Date(hw.at).toLocaleDateString("zh-CN")}</span>`
     : `<span class="mono">按本周任务拍照后交</span>`;
+  const open = expandedWeek === item.week;
   return `
-    <article class="plan-card ${done ? "done" : ""}" data-week="${item.week}">
+    <article class="plan-card ${done ? "done" : ""} ${open ? "open" : ""}" data-week="${item.week}">
       <div class="plan-week">
         <span>Week ${String(item.week).padStart(2, "0")}${done ? " · 已完成" : ""}</span>
-        <span>${item.hours || "点击展开"}</span>
+        <span class="plan-week-right">
+          <span>${item.hours || "点击展开"}</span>
+          <button class="plan-close" type="button" data-close="${item.week}" title="收起" aria-label="收起">×</button>
+        </span>
       </div>
       <h4 data-toggle="${item.week}">${item.title}</h4>
       <div class="plan-detail">
-        <div class="detail-block">
+        <div class="detail-block db-theory">
           <div class="label">理论要点</div>
           <ul>${item.theory.map((t) => `<li>${t}</li>`).join("")}</ul>
         </div>
-        <div class="detail-block">
+        <div class="detail-block db-task">
           <div class="label">拍摄任务</div>
           <p>${item.task}</p>
         </div>
-        <div class="detail-block">
+        <div class="detail-block db-check">
           <div class="label">自检标准</div>
           <p>${item.checkpoint}</p>
         </div>
         ${
           quiz.length
-            ? `<div class="detail-block quiz-block">
+            ? `<div class="detail-block db-quiz quiz-block">
           <div class="label">过关自测 · 答对 3 题再打卡</div>
           <ol class="quiz-list">${quiz.map((q) => `<li>${q}</li>`).join("")}</ol>
         </div>`
             : ""
         }
-        <div class="detail-block reading">
+        ${
+          item.examples?.length
+            ? `<div class="detail-block examples-block db-ex">
+          <div class="label">例图 · 看什么</div>
+          <div class="week-examples">
+            ${item.examples
+              .map(
+                (ex) => `
+            <figure class="week-example">
+              <img src="${ex.src}" alt="${esc(ex.caption || "")}" loading="lazy" onerror="this.closest('.week-example').classList.add('broken')" />
+              <figcaption>${esc(ex.caption || "")}<span class="ex-credit">图源 Unsplash</span></figcaption>
+            </figure>`
+              )
+              .join("")}
+          </div>
+        </div>`
+            : ""
+        }
+        <div class="detail-block db-read reading">
           <div class="label">延伸阅读 · 读什么</div>
           <p>${item.reading}</p>
           ${
@@ -154,7 +190,7 @@ function weekCard(item) {
               : ""
           }
         </div>
-        <div class="detail-block">
+        <div class="detail-block db-hw hw-block">
           <div class="label">作业点评 · 可选，AI 按本周知识点批改</div>
           <div class="hw-bar">
             <button class="btn btn-ghost sm" type="button" data-hw="${item.week}">${hw ? "查看 / 重交作业" : "交作业 · AI 点评"}</button>
@@ -180,13 +216,19 @@ function bindPlan() {
     }
     const h = e.target.closest("[data-toggle]");
     if (h) {
-      const card = h.closest(".plan-card");
-      card.classList.toggle("open");
+      toggleWeekCard(Number(h.dataset.toggle));
+      return;
+    }
+    const closeBtn = e.target.closest("[data-close]");
+    if (closeBtn) {
+      e.stopPropagation();
+      toggleWeekCard(Number(closeBtn.dataset.close), false);
       return;
     }
     const card = e.target.closest(".plan-card");
-    if (card && !e.target.closest(".plan-check")) {
-      card.classList.toggle("open");
+    // 展开状态下点正文不收起（避免选文字/点内容时误关），收起用 × 或再点标题
+    if (card && !card.classList.contains("open") && !e.target.closest(".plan-check")) {
+      toggleWeekCard(Number(card.dataset.week), true);
     }
   });
 
@@ -1151,6 +1193,8 @@ const MASK_SLIDERS = [
   { key: "brightness", name: "亮暗", min: -100, max: 100 },
   { key: "exposure", name: "曝光", min: -200, max: 200, scale: 100 },
   { key: "contrast", name: "对比", min: -100, max: 100 },
+  { key: "highlights", name: "高光", min: -100, max: 100 },
+  { key: "shadows", name: "阴影", min: -100, max: 100 },
   { key: "temp", name: "色温", min: -100, max: 100 },
   { key: "tint", name: "色调", min: -100, max: 100 },
   { key: "saturation", name: "饱和", min: -100, max: 100 },
@@ -1213,7 +1257,11 @@ function renderMaskUI() {
   }).join("");
 
   const geoDefs = m.type === "radial" ? MASK_GEO_RADIAL : MASK_GEO_GRAD;
-  geo.innerHTML = geoDefs.map((s) => {
+  geo.innerHTML =
+    (m.type === "grad"
+      ? `<p class="calc-note">角度 0°＝自上而下淡出，顺时针增大；长度＝从中心到效果消失的距离；羽化＝过渡带宽窄。</p>`
+      : `<p class="calc-note">直接在画布上拖动可移动蒙版；羽化控制边缘过渡的软硬。</p>`) +
+    geoDefs.map((s) => {
     const scale = s.scale || 1;
     const raw = m[s.key] ?? 0;
     return `<div class="slider-row">
@@ -1521,6 +1569,17 @@ function orgLog(msg, cls) {
   el.prepend(line);
 }
 
+/** GPS 坐标展示行；refKnown=false（EXIF 缺 N/S、E/W 标记）时明确提示方向未知 */
+function formatGpsLine(gps) {
+  if (!gps || !Number.isFinite(gps.lat) || !Number.isFinite(gps.lon)) return "";
+  if (gps.refKnown === false) {
+    return `<div class="org-exif mono org-gps-warn">GPS ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}（EXIF 缺半球标记：南北/东西方向未知，仅作参考）</div>`;
+  }
+  const ns = gps.lat >= 0 ? "N" : "S";
+  const ew = gps.lon >= 0 ? "E" : "W";
+  return `<div class="org-exif mono">GPS ${Math.abs(gps.lat).toFixed(4)}°${ns} ${Math.abs(gps.lon).toFixed(4)}°${ew}</div>`;
+}
+
 function renderOrgPreview() {
   const box = $("#orgPreview");
   if (!orgState.items.length) {
@@ -1536,6 +1595,7 @@ function renderOrgPreview() {
       <div class="path">
         ${esc(it.planned ? it.planned.path : it.relPath)}
         ${it.exifSummary ? `<div class="org-exif mono">${esc(it.exifSummary)}</div>` : ""}
+        ${formatGpsLine(it.exif?.gps)}
       </div>
       <span class="tag">${esc(it.category || "…")}</span>
     </div>
