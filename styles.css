@@ -308,7 +308,7 @@ select { font: inherit; color: inherit; }
 
 .quick-card .q-num {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.12em;
   color: var(--accent);
 }
@@ -422,7 +422,7 @@ select { font: inherit; color: inherit; }
 
 .hero-stats dt {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.12em;
   color: var(--ink-dim);
   margin: 0 0 6px;
@@ -930,7 +930,7 @@ select { font: inherit; color: inherit; }
 
 .detail-block .label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.12em;
   color: var(--accent);
   text-transform: uppercase;
@@ -1302,7 +1302,7 @@ select { font: inherit; color: inherit; }
 
 .viz-card h4 .mono {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: #8a7d6c;
   font-weight: 400;
 }
@@ -1841,7 +1841,7 @@ select { font: inherit; color: inherit; }
   border: 1px solid var(--line-strong);
   color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.1em;
 }
 
@@ -2199,7 +2199,7 @@ select { font: inherit; color: inherit; }
 
 .rule-label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.12em;
   color: var(--accent);
   text-transform: uppercase;
@@ -2342,7 +2342,7 @@ select { font: inherit; color: inherit; }
 
 .org-exif {
   margin-top: 2px;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
   opacity: 0.9;
 }
@@ -2354,7 +2354,7 @@ select { font: inherit; color: inherit; }
 
 .org-item .tag {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -2766,7 +2766,7 @@ body.mode-tool [data-group="learn"] {
   margin-left: 6px;
   font-style: normal;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--sage);
 }
 
@@ -2775,7 +2775,7 @@ body.mode-tool [data-group="learn"] {
 }
 
 .cull-name {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2897,7 +2897,7 @@ body.mode-tool [data-group="learn"] {
   max-height: 120px;
   overflow: auto;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--ink-dim);
   line-height: 1.6;
   background: rgba(0, 0, 0, 0.2);
@@ -3372,7 +3372,7 @@ body.mode-tool [data-group="learn"] {
 
 .quiz-card .q-meta {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.1em;
   color: var(--ink-dim);
   margin-bottom: 6px;
