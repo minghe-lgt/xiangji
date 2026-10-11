@@ -284,13 +284,13 @@ function buildGradeSession(srcCanvas, params) {
     for (let v = 0; v < 256; v++) toneLUT[v] = applyCurve(clarityCurve(contrastCurve(v)));
   }
 
-  // 褪色按通道值函数 → 256 项查找表
+  // 褪色按通道值函数 → 256 项查找表（曲线输出是 0..255 像素域，必须 ×255）
   let fadeLUT = null;
   if (hasFade) {
     fadeLUT = new Uint8ClampedArray(256);
     for (let v = 0; v < 256; v++) {
       const x = v / 255;
-      fadeLUT[v] = fade * 0.18 + x * (1 - fade * 0.28);
+      fadeLUT[v] = (fade * 0.18 + x * (1 - fade * 0.28)) * 255;
     }
   }
 

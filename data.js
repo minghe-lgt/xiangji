@@ -8,6 +8,11 @@ const STAGES = [
     weeks: [
       {
         week: 1,
+        examples: [
+            { src: "examples/w01-1.jpg", caption: "大光圈把背景串灯融成一团团光斑，孩子的眼睛依旧锐利——请看焦内与焦外的分界" },
+            { src: "examples/w01-2.jpg", caption: "高速快门把倒下的红色液柱与四溅的液滴全部钉在半空——每一滴都清晰可数" },
+            { src: "examples/w01-3.jpg", caption: "夜晚城市光线微弱，靠提高感光度才能手持成片——观察楼群灯光与暗部噪点的平衡" },
+        ],
         title: "认识相机与曝光三角",
         theory: [
           "光圈：控制进光量与景深。f 值越小光圈越大，背景越虚。",
@@ -32,6 +37,11 @@ const STAGES = [
       },
       {
         week: 2,
+        examples: [
+            { src: "examples/w02-1.jpg", caption: "人物背对明亮窗户呈半剪影——正好演示点测光与逆光人像的+EV补偿思路" },
+            { src: "examples/w02-2.jpg", caption: "白雪占满画面时相机会自动拍灰——白加黑减，需要+1到+2EV才能把雪拍白" },
+            { src: "examples/w02-3.jpg", caption: "大面积深黑背景衬托一朵浅色大丽花——黑减，收-EV才能保住背景的深邃" },
+        ],
         title: "测光模式与曝光补偿",
         theory: [
           "评价测光/矩阵测光：适合场景光比均匀时。",
@@ -56,6 +66,10 @@ const STAGES = [
       },
       {
         week: 3,
+        examples: [
+            { src: "examples/w03-1.jpg", caption: "AF-C连续对焦跟住迎面骑来的车手，人与车完全凝固清晰，背景被甩成模糊色块" },
+            { src: "examples/w03-2.jpg", caption: "单点对焦精准落在虹膜上，瞳孔与睫毛纤毫毕现——请放大检查虹膜纹理的锐度" },
+        ],
         title: "对焦系统与画质设置",
         theory: [
           "AF-S / 单次对焦：静态主体；AF-C / 连续对焦：运动主体。",
@@ -80,6 +94,10 @@ const STAGES = [
       },
       {
         week: 4,
+        examples: [
+            { src: "examples/w04-1.jpg", caption: "三脚架长曝光：车灯拉成红白两条光轨，静止的树木天空依然锐利——看动静对比" },
+            { src: "examples/w04-2.jpg", caption: "手持夜景贴着安全快门拍，霓虹招牌与湿地倒影清晰不糊——注意光源没有抖动重影" },
+        ],
         title: "持机、稳定与安全快门",
         theory: [
           "安全快门 ≈ 1/焦距（等效）。50mm 镜头手持不低于 1/50s。",
@@ -111,6 +129,10 @@ const STAGES = [
     weeks: [
       {
         week: 5,
+        examples: [
+            { src: "examples/w05-1.jpg", caption: "雾气让大半画面亮成一片，直方图整体靠右但不顶格——高调曝光的典型形态" },
+            { src: "examples/w05-2.jpg", caption: "从白色浓雾到黑色树影层层过渡——直方图铺满横轴、明暗层次丰富的理想范本" },
+        ],
         title: "直方图与向右曝光",
         theory: [
           "直方图：左侧暗部 / 中间调 / 右侧高光，没有绝对「标准形状」。",
@@ -135,6 +157,10 @@ const STAGES = [
       },
       {
         week: 6,
+        examples: [
+            { src: "examples/w06-1.jpg", caption: "f/11小光圈下近处木栏、草地与远处山脊全部清晰——超焦距对焦带来的完整景深" },
+            { src: "examples/w06-2.jpg", caption: "花瓣层层叠叠，只有中间一圈落在焦内，前后瞬间化开——微距焦平面薄如纸" },
+        ],
         title: "景深与超焦距",
         theory: [
           "景深三要素：光圈、焦距、拍摄距离。距离影响最大。",
@@ -159,6 +185,10 @@ const STAGES = [
       },
       {
         week: 7,
+        examples: [
+            { src: "examples/w07-1.jpg", caption: "钨丝灯把铜罩灯泡染成橙黄，整个画面偏暖——这就是低色温光源的烙印" },
+            { src: "examples/w07-2.jpg", caption: "雪林被黎明蓝调统一成冷青色，高色温环境下相机若不校正，画面就会整体偏蓝" },
+        ],
         title: "白平衡与色温",
         theory: [
           "色温：低色温偏暖（烛光 ~2000K），高色温偏冷（阴影 ~8000K+）。",
@@ -183,6 +213,10 @@ const STAGES = [
       },
       {
         week: 8,
+        examples: [
+            { src: "examples/w08-1.jpg", caption: "A档街头抓拍：光圈管住景深，主体行人清晰、背景店铺可辨，雨天地面反光增添层次" },
+            { src: "examples/w08-2.jpg", caption: "拍完回看屏幕：检查曝光、对焦与构图再离开，这是拍摄流程里最关键的一步" },
+        ],
         title: "曝光模式与拍摄流程",
         theory: [
           "A/Av：光圈优先——控制景深的首选。",
@@ -192,7 +226,7 @@ const STAGES = [
         ],
         task: "一次外出拍摄只用一种模式拍完 30 张；下次换另一模式。写 100 字对比感受。",
         checkpoint: "能为三种场景（人像/风光/运动）各选出最合适的拍摄模式并说明原因。",
-        reading: "Thomas 看看世界 · 曝光实战笔记",
+        reading: "Peterson《理解曝光》第 2–3 章 · 光圈优先/快门优先的创造性使用",
         readPoints: [
           "A/S/M/P 只差『你亲手负责哪个变量』",
           "书里的实战顺序：光圈定景深 → 快门保安全 → ISO 兜底",
@@ -214,6 +248,10 @@ const STAGES = [
     weeks: [
       {
         week: 9,
+        examples: [
+            { src: "examples/w09-1.jpg", caption: "日落海面把地平线压在下三分线上，天海比例二比一，画面安定而不呆板" },
+            { src: "examples/w09-2.jpg", caption: "人物放在右侧三分线并望向画外留白，视线方向有了呼吸空间，主体立刻不再拥挤" },
+        ],
         title: "构图三原则与三分法",
         theory: [
           "简化：减掉一切不服务主题的元素（Freeman「减法」）。",
@@ -238,6 +276,11 @@ const STAGES = [
       },
       {
         week: 10,
+        examples: [
+            { src: "examples/w10-1.jpg", caption: "车道白线把视线笔直引向灭点，两侧旷野收拢，引导线让平面照片有了纵深感" },
+            { src: "examples/w10-2.jpg", caption: "用装饰拱门当画框，把远处亮门套进框里，框架式构图让主体聚焦、层次立现" },
+            { src: "examples/w10-3.jpg", caption: "从楼梯井垂直俯拍，台阶与扶手旋成完美螺旋，眼睛顺着曲线一路滑向圆心" },
+        ],
         title: "引导线、框架与几何",
         theory: [
           "引导线：道路、栏杆、光影、河流把视线引向主体。",
@@ -262,6 +305,10 @@ const STAGES = [
       },
       {
         week: 11,
+        examples: [
+            { src: "examples/w11-1.jpg", caption: "前景的水草把镜头前的一米拉进画面，与雪山倒影形成远近呼应，纵深感由此而来" },
+            { src: "examples/w11-2.jpg", caption: "两只小鸟只占画面百分之一，大片灰空成了负空间，极简构图靠留白讲孤独感" },
+        ],
         title: "视觉重心、平衡与前景",
         theory: [
           "视觉重量：亮 > 暗、大 > 小、清晰 > 模糊、暖 > 冷、人脸/文字最强。",
@@ -286,6 +333,10 @@ const STAGES = [
       },
       {
         week: 12,
+        examples: [
+            { src: "examples/w12-1.jpg", caption: "弧线塔楼层叠盘旋，条纹随曲线流动，视线被螺旋弧面带着走，正是黄金螺旋的味道" },
+            { src: "examples/w12-2.jpg", caption: "行人缩成一粒墨点落在巨大曲面下，重心偏到一角却稳稳站住——打破常规的平衡" },
+        ],
         title: "黄金比例与个人构图习惯",
         theory: [
           "黄金分割 / 斐波那契螺旋：比三分法更「有机」的焦点放置。",
@@ -317,6 +368,11 @@ const STAGES = [
     weeks: [
       {
         week: 13,
+        examples: [
+            { src: "examples/w13-1.jpg", caption: "柔和的窗光从侧面轻扫面部，明暗过渡没有生硬边缘——软光让皮肤质感更细腻" },
+            { src: "examples/w13-2.jpg", caption: "人物完全压成黑色剪影，只保留轮廓；天空越亮剪影越干脆，逆光位决定一切" },
+            { src: "examples/w13-3.jpg", caption: "正午顶光把行人影子压得又黑又实，影子边缘锋利——硬光的力量感全在投影上" },
+        ],
         title: "光质与光位",
         theory: [
           "硬光（直射日光/裸灯）：高反差、边缘锐利、戏剧感。",
@@ -341,6 +397,10 @@ const STAGES = [
       },
       {
         week: 14,
+        examples: [
+            { src: "examples/w14-1.jpg", caption: "太阳贴近地平线，金色低角度光把整片草场染成暖黄——黄金时刻的色温与长影" },
+            { src: "examples/w14-2.jpg", caption: "日落后天空呈深邃蓝色，城市灯光与蓝调形成冷暖对比——蓝调时刻只有二十分钟" },
+        ],
         title: "黄金时刻与蓝调时刻",
         theory: [
           "黄金时刻：日出后 / 日落前 1 小时，光线低角度、色温暖、阴影长。",
@@ -350,7 +410,7 @@ const STAGES = [
         ],
         task: "连续 3 天在同一地点拍黄金时刻与蓝调时刻，比较色温与氛围。",
         checkpoint: "知道拍摄题材对应的最佳时段，并愿意为光线出门。",
-        reading: "Thomas 看看世界 · 风光用光课",
+        reading: "Peterson《理解曝光》· 光线部分：方向、质感与色温的实际运用",
         readPoints: [
           "色温随太阳高度变化的曲线是这章核心，记走势不记数字",
           "蓝调时刻的窗口比想象中短——提前踩点",
@@ -365,6 +425,10 @@ const STAGES = [
       },
       {
         week: 15,
+        examples: [
+            { src: "examples/w15-1.jpg", caption: "夜景里主体被街灯补光照亮，背景灯串化作光斑保留夜色——补光足、夜景不丢" },
+            { src: "examples/w15-2.jpg", caption: "昏暗室内只给面部一点补光，肤色干净、背景自然压暗——弱光人像的关键是面部曝光" },
+        ],
         title: "闪光灯与补光基础",
         theory: [
           "TTL：自动闪光，适合快速抓拍；M 档闪光：影棚与可控场景。",
@@ -389,6 +453,10 @@ const STAGES = [
       },
       {
         week: 16,
+        examples: [
+            { src: "examples/w16-1.jpg", caption: "大面积黑背景配侧光，半张脸隐入阴影——低调影调靠光比营造沉静与神秘" },
+            { src: "examples/w16-2.jpg", caption: "整幅画面近乎全白，雪丘只有柔和的浅影勾勒起伏——高调要亮而不曝、影少而柔" },
+        ],
         title: "影调与情绪",
         theory: [
           "高调（High Key）：大面积亮部，轻盈、纯净、商业感。",
@@ -420,6 +488,10 @@ const STAGES = [
     weeks: [
       {
         week: 17,
+        examples: [
+            { src: "examples/w17-1.jpg", caption: "孤峰立在云海之上，日出暖光染红峰顶——云海的层次和粉色渐变天空就是纵深" },
+            { src: "examples/w17-2.jpg", caption: "慢门把海浪拉成白色丝绢绕过礁石，水面雾化岩石清晰——长曝光让动静同框" },
+        ],
         title: "风光摄影",
         theory: [
           "前景 + 中景 + 远景三层结构是风光的骨架。",
@@ -429,7 +501,7 @@ const STAGES = [
         ],
         task: "完成一组 9 张风光组照：至少含前景、倒影、长曝各 1 张。",
         checkpoint: "能用超焦距或景深合成得到从前景到无穷远清晰的风光片。",
-        reading: "Thomas 看看世界 · 风光课件",
+        reading: "Galen Rowell《Mountain Light（山岳之光）》· 风光用光与等待的经典",
         readPoints: [
           "风光的本质是等：等光、等云、等季节",
           "前景—中景—远景的层次安排贯穿全章",
@@ -444,6 +516,10 @@ const STAGES = [
       },
       {
         week: 18,
+        examples: [
+            { src: "examples/w18-1.jpg", caption: "人物倚在石桥上，公园绿意交代了周末出游的场景——环境人像靠场景与姿态共同叙事" },
+            { src: "examples/w18-2.jpg", caption: "两人同时大笑并指向天空，动作和视线把观者引向画外——抓拍抢的是情绪高点" },
+        ],
         title: "人像与叙事",
         theory: [
           "眼神光是人像的生命：让光源出现在眼睛前方。",
@@ -468,6 +544,10 @@ const STAGES = [
       },
       {
         week: 19,
+        examples: [
+            { src: "examples/w19-1.jpg", caption: "黄昏低角度光把行人影子拉成斜线，黑白里看光比、剪影与决定性瞬间如何同时成立" },
+            { src: "examples/w19-2.jpg", caption: "摊贩推着水果车穿过斑马线，伞棚与人流构成市井纪实——看主体动作与环境交代的层次" },
+        ],
         title: "街头与纪实",
         theory: [
           "决定性瞬间（布列松）：等待几何与事件同时对齐。",
@@ -492,6 +572,10 @@ const STAGES = [
       },
       {
         week: 20,
+        examples: [
+            { src: "examples/w20-1.jpg", caption: "暗调俯拍：黑背景只留一盏侧光，食物与道具错落——看布光方向、负空间与色彩点缀" },
+            { src: "examples/w20-2.jpg", caption: "两色背景墙前的产品队列，单灯造出柔和投影——看瓶身高光、背景分区与留白构图" },
+        ],
         title: "静物、美食与产品",
         theory: [
           "窗光是免费的柔光箱：侧 45° 是最经典光位。",
@@ -523,6 +607,10 @@ const STAGES = [
     weeks: [
       {
         week: 21,
+        examples: [
+            { src: "examples/w21-1.jpg", caption: "笔记本上的人像修图界面：直方图、调整面板与缩略图同屏——看后期流程在屏幕上如何展开" },
+            { src: "examples/w21-2.jpg", caption: "双屏修图工作台：一屏浏览一屏调整，桌面还摆着胶片与镜头——看工作流的空间安排" },
+        ],
         title: "后期流程（Lightroom/Camera Raw）",
         theory: [
           "全局：白平衡 → 曝光 → 高光/阴影 → 白色/黑色色阶 → 对比度。",
@@ -532,7 +620,7 @@ const STAGES = [
         ],
         task: "选 5 张 RAW，建立你自己的「一键基础调」预设，并写出 8 步固定流程。",
         checkpoint: "能在 5 分钟内完成一张照片的完整基础后期。",
-        reading: "Lightroom 官方教程 · 风光后期工作流",
+        reading: "Scott Kelby《The Adobe Photoshop Lightroom Classic Book》· 跟着完整流程走一遍",
         readPoints: [
           "先定流程再谈手法：导入→筛选→全局→局部→输出",
           "RAW 显影面板的排布顺序，就是曝光逻辑的顺序",
@@ -547,6 +635,10 @@ const STAGES = [
       },
       {
         week: 22,
+        examples: [
+            { src: "examples/w22-1.jpg", caption: "照片打印机正吐出一张黑白照片，旁置胶片相机——从拍摄到输出，纸张是色彩管理的终点" },
+            { src: "examples/w22-2.jpg", caption: "扇形色卡铺满画面，色相与明度连续过渡——校色时对照它检查屏幕与输出的偏差" },
+        ],
         title: "色彩管理与输出",
         theory: [
           "色域：sRGB 用于网络，Adobe RGB / Display P3 用于印刷与广色域屏。",
@@ -556,7 +648,7 @@ const STAGES = [
         ],
         task: "导出同一张照片的 sRGB 与 Adobe RGB 各一版，在不同设备上对比。",
         checkpoint: "知道作品发网络与送印刷分别该用什么色彩空间。",
-        reading: "色彩管理入门 · 输出工作流",
+        reading: "Jeff Schewe《The Digital Print》· 软打样与输出流程",
         readPoints: [
           "色域不匹配是『发灰』的第一嫌疑人",
           "导出对话框的每一项，这篇讲全了",
@@ -571,6 +663,10 @@ const STAGES = [
       },
       {
         week: 23,
+        examples: [
+            { src: "examples/w23-1.jpg", caption: "洗出来的照片摊在布上重新排布——组照编辑就是在这里决定顺序、取舍与节奏" },
+            { src: "examples/w23-2.jpg", caption: "画廊墙上四幅装裱黑白照在射灯下，观展者背身而立——看成组展示的间距与视线高度" },
+        ],
         title: "组照编辑与作品集",
         theory: [
           "编辑（Editing）是摄影的一半：选片比拍片更难。",
@@ -595,6 +691,10 @@ const STAGES = [
       },
       {
         week: 24,
+        examples: [
+            { src: "examples/w24-1.jpg", caption: "暮色里摄影师俯身调试三脚架上的相机，身旁还立着一支——持续练习就是无数个这样的傍晚" },
+            { src: "examples/w24-2.jpg", caption: "深色桌面上的器材网格平铺：机身、镜头、电池分区归位——个人体系从清点自己的装备开始" },
+        ],
         title: "个人风格与持续练习",
         theory: [
           "风格 = 反复出现的选择：题材、色彩、光位、构图偏好。",
@@ -629,6 +729,9 @@ const READING_LIST = [
   { title: "思想的眼睛 (The Mind's Eye)", author: "亨利·卡蒂埃-布列松", note: "决定性瞬间的本人阐述，比《明室》好进入；街头周前后读。", level: "进阶", weeks: "W19" },
   { title: "论摄影 (On Photography)", author: "Susan Sontag", note: "不教技术，教你看懂摄影这件事本身。选读。", level: "进阶", weeks: "不限 · 进阶选读" },
   { title: "The Americans", author: "Robert Frank", note: "学习组照编辑与街头情绪的范本；看顺序再看单张。", level: "进阶", weeks: "W23" },
+  { title: "Mountain Light（山岳之光）", author: "Galen Rowell", note: "风光用光与「等待」的经典；山野光线如何变成画面。", level: "基础→进阶", weeks: "W14 · W17" },
+  { title: "The Adobe Photoshop Lightroom Classic Book", author: "Scott Kelby", note: "跟着一本书把 Lightroom 完整流程走一遍，步骤导向、即查即用。", level: "基础", weeks: "W21" },
+  { title: "The Digital Print", author: "Jeff Schewe", note: "从软打样到输出的完整链路；色彩管理的终点是印出来。", level: "进阶", weeks: "W22" },
   { title: "风光后期系统课（线上）", author: "Thomas 看看世界", note: "国内风光后期最有体系的一门课；先跟流程，再谈风格化。", level: "基础→进阶", weeks: "W21–22" },
 ];
 
