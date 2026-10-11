@@ -1030,9 +1030,28 @@ function setupGrade() {
   function syncModelList() {
     const v = LLM_VENDORS.find((x) => x.id === vendorSel.value) || LLM_VENDORS[0];
     $("#llmModelList").innerHTML = v.models.map((m) => `<option value="${m}">`).join("");
-    if (!$("#llmModel").value && v.models[0]) $("#llmModel").value = v.models[0];
-    if (v.baseUrl && !$("#llmBaseUrl").value) $("#llmBaseUrl").value = v.baseUrl;
-    if (v.id !== "custom") $("#llmBaseUrl").value = v.baseUrl;
+    // 换厂商要跟着换模型：有该厂商的已存模型就恢复，否则给该厂商标首项（custom 清空待手输）。
+    // 旧行为只在输入框为空时才填，导致切厂商后残留上一家的模型名，保存后厂商/模型错配。
+    const saved = loadLLMConfig();
+    if (saved.vendorId === v.id && saved.model) {
+      $("#llmModel").value = saved.model;
+    } else {
+      $("#llmModel").value = v.models[0] || "";
+    }
+    if (v.id === "custom") {
+      // 自定义中转：Base URL 有存档恢复存档，否则清空——绝不能留上一家的地址静默发错
+      $("#llmBaseUrl").value = (saved.vendorId === "custom" && saved.baseUrl) ? saved.baseUrl : "";
+      $("#llmBaseUrl").placeholder = "https://your-relay.example.com/v1";
+    } else {
+      $("#llmBaseUrl").value = v.baseUrl;
+    }
+    // 可视化候选，替代「藏在输入框里的联想」
+    const hint = $("#llmModelHint");
+    if (hint) {
+      hint.textContent = v.models.length
+        ? `可选：${v.models.join("、")}（也可以直接输入其他模型名）`
+        : "自定义厂商需手动输入模型名（以你的中转/服务方文档为准）";
+    }
   }
   vendorSel.addEventListener("change", syncModelList);
   syncModelList();
